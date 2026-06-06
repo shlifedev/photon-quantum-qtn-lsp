@@ -58,4 +58,21 @@ component Player {
     const labels = complete(source, 1, 7);
     expect(labels).toEqual(expect.arrayContaining(['FP', 'int']));
   });
+
+  it('attribute string ending in an escaped backslash does not leak attribute context', () => {
+    // The string literal is "a\\" — an escaped backslash before the real closing
+    // quote. A naive one-char escape check mistakes the closing quote for an
+    // escaped one, leaving the scanner "in string" so the ']' is never counted
+    // and the bracket looks unmatched. The line below should be field-type, not
+    // attribute, context.
+    const source = `component Player {
+  [Header("a\\\\")]
+
+}`;
+    const labels = complete(source, 2, 2);
+    expect(labels).toEqual(expect.arrayContaining(['FP', 'int']));
+    expect(labels).not.toEqual(
+      expect.arrayContaining(ATTRIBUTES.map((a) => a.name)),
+    );
+  });
 });

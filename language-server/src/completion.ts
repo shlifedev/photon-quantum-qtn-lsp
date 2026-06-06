@@ -23,6 +23,7 @@ import {
 } from './builtins.js';
 import { getLocale } from './locale.js';
 import { nodeKindToSymbolKind } from './symbol-table.js';
+import { scanBrackets } from './text-navigation.js';
 
 // Completion context types
 type CompletionContext =
@@ -128,57 +129,7 @@ function detectContext(
  * Check if there's an unmatched '[' (inside attribute)
  */
 function hasUnmatchedOpenBracket(text: string): boolean {
-  let openCount = 0;
-  let inString = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-
-    // Handle comments
-    if (!inString && !inBlockComment && ch === '/' && next === '/') {
-      inLineComment = true;
-      i++;
-      continue;
-    }
-    if (!inString && !inLineComment && ch === '/' && next === '*') {
-      inBlockComment = true;
-      i++;
-      continue;
-    }
-    if (inBlockComment && ch === '*' && next === '/') {
-      inBlockComment = false;
-      i++;
-      continue;
-    }
-    if (inLineComment && (ch === '\n' || ch === '\r')) {
-      inLineComment = false;
-      continue;
-    }
-
-    // Skip if in comment
-    if (inLineComment || inBlockComment) continue;
-
-    // Handle strings
-    if (ch === '"' && (i === 0 || text[i - 1] !== '\\')) {
-      inString = !inString;
-      continue;
-    }
-
-    // Skip if in string
-    if (inString) continue;
-
-    // Count brackets
-    if (ch === '[') {
-      openCount++;
-    } else if (ch === ']') {
-      openCount--;
-    }
-  }
-
-  return openCount > 0;
+  return scanBrackets(text).squareDepth > 0;
 }
 
 /**
@@ -264,30 +215,8 @@ function isInsideInputBlock(text: string, offset: number): boolean {
  * Check if in field type position (inside block, after '{' or ';')
  */
 function isFieldTypePosition(text: string, offset: number): boolean {
-  // Look for unmatched '{' without a closing '}'
-  let braceDepth = 0;
-  let inString = false;
-
-  for (let i = 0; i < offset; i++) {
-    const ch = text[i];
-
-    // Handle strings
-    if (ch === '"' && (i === 0 || text[i - 1] !== '\\')) {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) continue;
-
-    if (ch === '{') {
-      braceDepth++;
-    } else if (ch === '}') {
-      braceDepth--;
-    }
-  }
-
-  // We're in field type position if we're inside a block (braceDepth > 0)
-  return braceDepth > 0;
+  // We're in field type position when the cursor sits inside an open block.
+  return scanBrackets(text.substring(0, offset)).braceDepth > 0;
 }
 
 /**
