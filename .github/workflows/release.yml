@@ -64,6 +64,7 @@ jobs:
       JETBRAINS_PRIVATE_KEY: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
       JETBRAINS_PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
       JETBRAINS_PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
   release:
     needs: [version, build]

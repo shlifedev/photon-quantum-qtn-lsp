@@ -10,7 +10,7 @@ on:
         type: string
         required: false
         default: ''
-    # JetBrains 서명/마켓 배포용. dev·PR 빌드에서는 비어 있어도 동작하므로 모두 optional.
+    # JetBrains 서명/마켓 배포 + VSCode 마켓 배포용. dev·PR 빌드에서는 비어 있어도 동작하므로 모두 optional.
     secrets:
       JETBRAINS_CERTIFICATE_CHAIN:
         required: false
@@ -19,6 +19,8 @@ on:
       JETBRAINS_PRIVATE_KEY_PASSWORD:
         required: false
       JETBRAINS_PUBLISH_TOKEN:
+        required: false
+      VSCE_PAT:
         required: false
 
 permissions:
@@ -67,6 +69,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # 게시 스텝의 if에서 시크릿 존재 여부를 보려면 job 레벨 env가 필요하다(step env는 같은 step if에서 못 읽음).
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,6 +113,13 @@ jobs:
           name: vscode-vsix
           path: release/QtnLSP-vscode.vsix
           retention-days: 7
+
+      # 버전 릴리스이고 VSCE_PAT가 설정돼 있으면 마켓플레이스에 게시. PAT 미설정 시 자동 스킵해
+      # 릴리스 파이프라인이 깨지지 않게 한다. --skip-duplicate로 같은 버전 재실행도 안전.
+      - name: Publish to VSCode Marketplace
+        if: inputs.version != '' && env.VSCE_PAT != ''
+        working-directory: vscode-extension
+        run: npx vsce publish --packagePath ../release/QtnLSP-vscode.vsix --skip-duplicate
 
   build-jetbrains:
     needs: test
