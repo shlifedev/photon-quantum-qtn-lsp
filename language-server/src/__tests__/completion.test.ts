@@ -58,4 +58,16 @@ component Player {
     const labels = complete(source, 1, 7);
     expect(labels).toEqual(expect.arrayContaining(['FP', 'int']));
   });
+
+  it('ignores braces in line comments when detecting top-level completion context', () => {
+    const labels = complete('// component Ghost {\n', 1, 0);
+    expect(labels).toEqual(expect.arrayContaining(['component']));
+    expect(labels).not.toContain('FP');
+  });
+
+  it('ignores input blocks mentioned inside block comments', () => {
+    const labels = complete('/* input { */\n', 1, 0);
+    expect(labels).toEqual(expect.arrayContaining(['component']));
+    expect(labels).not.toContain('button');
+  });
 });
