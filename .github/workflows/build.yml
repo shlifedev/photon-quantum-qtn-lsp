@@ -209,6 +209,9 @@ jobs:
     needs: test
     runs-on: windows-latest
     timeout-minutes: 25
+    # 게시 스텝 if에서 시크릿 존재 여부를 보려면 job 레벨 env가 필요(build-vscode와 동일 이유).
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -268,3 +271,21 @@ jobs:
           name: vs-vsix
           path: release/QtnLSP-vs.vsix
           retention-days: 7
+
+      # 버전 릴리스이고 VSCE_PAT가 있으면 VS Marketplace에 게시. VSCE_PAT는 VSCode와 공유한다
+      # (둘 다 marketplace.visualstudio.com / Azure DevOps PAT). PAT 미설정 시 자동 스킵.
+      # VsixPublisher는 확장이 없으면 생성, 있으면 같은 버전도 덮어쓰므로 멱등.
+      - name: Publish to VS Marketplace
+        if: inputs.version != '' && env.VSCE_PAT != ''
+        working-directory: vs-extension
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsdir = & $vswhere -latest -property installationPath
+          $publisher = Join-Path $vsdir 'VSSDK\VisualStudioIntegration\Tools\Bin\VsixPublisher.exe'
+          if (-not (Test-Path $publisher)) { throw "VsixPublisher.exe not found at $publisher" }
+          & $publisher publish `
+            -payload "..\release\QtnLSP-vs.vsix" `
+            -publishManifest "vs-publish.json" `
+            -personalAccessToken "$env:VSCE_PAT"
+          if ($LASTEXITCODE -ne 0) { throw "VsixPublisher exited with $LASTEXITCODE" }

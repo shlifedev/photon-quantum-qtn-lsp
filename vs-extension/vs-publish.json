@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json.schemastore.org/vsix-publish",
+  "categories": ["coding"],
+  "identity": { "internalName": "QtnLanguageSupport" },
+  "overview": "overview.md",
+  "priceCategory": "free",
+  "publisher": "shlifedev",
+  "private": false,
+  "qna": true,
+  "repo": "https://github.com/shlifedev/QtnLSP"
+}
