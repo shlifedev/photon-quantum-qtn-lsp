@@ -28,3 +28,7 @@ npm-debug.log*
 
 # Worktrees
 .worktrees/
+
+# Plugin signing keys (절대 커밋 금지)
+*.pem
+*.crt

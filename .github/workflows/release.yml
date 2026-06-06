@@ -59,6 +59,11 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.new_version }}
+    secrets:
+      JETBRAINS_CERTIFICATE_CHAIN: ${{ secrets.JETBRAINS_CERTIFICATE_CHAIN }}
+      JETBRAINS_PRIVATE_KEY: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
+      JETBRAINS_PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
+      JETBRAINS_PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
 
   release:
     needs: [version, build]
