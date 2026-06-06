@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { workspace, ExtensionContext, env } from 'vscode';
+import { workspace, ExtensionContext, env, window } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -9,7 +9,7 @@ import {
 
 let client: LanguageClient | undefined;
 
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
   // Path to the language server module (bundled)
   const serverModule = path.join(
     context.extensionPath,
@@ -42,7 +42,14 @@ export function activate(context: ExtensionContext) {
     clientOptions
   );
 
-  client.start();
+  try {
+    await client.start();
+  } catch (err) {
+    console.error('QTN language server failed to start:', err);
+    void window.showErrorMessage(
+      `QTN Language Server failed to start: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
