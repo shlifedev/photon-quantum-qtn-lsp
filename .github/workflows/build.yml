@@ -1,0 +1,270 @@
+name: Build
+
+# CI와 Release가 공유하는 빌드 파이프라인.
+# version 입력이 비어 있으면 dev 빌드(버전 주입 없음), 값이 있으면 각 아티팩트에 주입한다.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: '아티팩트에 주입할 릴리스 버전 (예: v1.2.3). 비우면 dev 빌드.'
+        type: string
+        required: false
+        default: ''
+    # JetBrains 서명/마켓 배포 + VSCode 마켓 배포용. dev·PR 빌드에서는 비어 있어도 동작하므로 모두 optional.
+    secrets:
+      JETBRAINS_CERTIFICATE_CHAIN:
+        required: false
+      JETBRAINS_PRIVATE_KEY:
+        required: false
+      JETBRAINS_PRIVATE_KEY_PASSWORD:
+        required: false
+      JETBRAINS_PUBLISH_TOKEN:
+        required: false
+      VSCE_PAT:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            language-server/package-lock.json
+            vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix language-server ci
+          npm --prefix vscode-extension ci
+
+      - name: Sync grammar
+        run: cp shared/syntaxes/qtn.tmLanguage.json vscode-extension/syntaxes/qtn.tmLanguage.json
+
+      - name: Language Server unit tests
+        run: npm --prefix language-server test
+
+      - name: Language Server protocol integration test
+        # Spawns the real compiled server.js and drives it over the LSP wire —
+        # the exact contract VSCode, Visual Studio, and Rider all invoke.
+        run: npm --prefix language-server run test:integration
+
+      - name: Grammar tests
+        run: npm --prefix vscode-extension test
+
+      - name: Grammar snapshot test
+        run: npm --prefix vscode-extension run test:snap
+
+  build-vscode:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # 게시 스텝의 if에서 시크릿 존재 여부를 보려면 job 레벨 env가 필요하다(step env는 같은 step if에서 못 읽음).
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            language-server/package-lock.json
+            vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix language-server ci
+          npm --prefix vscode-extension ci
+
+      - name: Sync grammar
+        run: cp shared/syntaxes/qtn.tmLanguage.json vscode-extension/syntaxes/qtn.tmLanguage.json
+
+      - name: Inject version
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm --prefix vscode-extension version "${VERSION#v}" --no-git-tag-version --allow-same-version
+
+      - name: Package VSIX
+        working-directory: vscode-extension
+        run: npx vsce package --no-dependencies
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p release
+          cp vscode-extension/*.vsix release/QtnLSP-vscode.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode-vsix
+          path: release/QtnLSP-vscode.vsix
+          retention-days: 7
+
+      # 버전 릴리스이고 VSCE_PAT가 설정돼 있으면 마켓플레이스에 게시. PAT 미설정 시 자동 스킵해
+      # 릴리스 파이프라인이 깨지지 않게 한다. --skip-duplicate로 같은 버전 재실행도 안전.
+      - name: Publish to VSCode Marketplace
+        if: inputs.version != '' && env.VSCE_PAT != ''
+        working-directory: vscode-extension
+        run: npx vsce publish --packagePath ../release/QtnLSP-vscode.vsix --skip-duplicate
+
+  build-jetbrains:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            language-server/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build language-server
+        run: |
+          npm --prefix language-server ci
+          npm --prefix language-server run build
+
+      - name: Sync grammar
+        run: cp shared/syntaxes/qtn.tmLanguage.json jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
+
+      # 릴리스(version 있음)면 서명본을 만들고, PR/dev면 서명 없이 빌드만 검증한다.
+      # 시크릿은 base64로 저장돼 있어 파일로 디코드 후 경로를 주입한다(멀티라인 전달 손상 회피).
+      - name: Build / sign JetBrains plugin
+        working-directory: jetbrains-plugin
+        env:
+          VERSION: ${{ inputs.version }}
+          CERTIFICATE_CHAIN_B64: ${{ secrets.JETBRAINS_CERTIFICATE_CHAIN }}
+          PRIVATE_KEY_B64: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$VERSION" ]; then
+            printf '%s' "$CERTIFICATE_CHAIN_B64" | base64 -d > sign-chain.crt
+            printf '%s' "$PRIVATE_KEY_B64" | base64 -d > sign-private.pem
+            keytool -printcert -file sign-chain.crt >/dev/null \
+              || { echo "::error::certificate chain failed to parse — check JETBRAINS_CERTIFICATE_CHAIN (must be base64 of chain.crt)"; exit 1; }
+            export CERTIFICATE_CHAIN_FILE=sign-chain.crt PRIVATE_KEY_FILE=sign-private.pem
+            ./gradlew signPlugin "-PpluginVersion=${VERSION#v}"
+          else
+            ./gradlew buildPlugin
+          fi
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p release
+          # signPlugin은 *-signed.zip을 추가로 만든다. 릴리스면 서명본, dev면 일반 zip을 고른다.
+          signed=$(find jetbrains-plugin/build/distributions -name '*-signed.zip' | head -1)
+          if [ -n "$signed" ]; then
+            cp "$signed" release/QtnLSP-jetbrains.zip
+          else
+            cp jetbrains-plugin/build/distributions/*.zip release/QtnLSP-jetbrains.zip
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jetbrains-zip
+          path: release/QtnLSP-jetbrains.zip
+          retention-days: 7
+
+      # 첫 버전은 마켓에 수동 업로드해야 리스팅이 생긴다. 그 전엔 publishPlugin이 실패하므로,
+      # 리스팅 승인 후 `gh variable set JETBRAINS_MARKETPLACE_LISTED --body true`로 켜면 그때부터 자동 배포.
+      - name: Publish to JetBrains Marketplace
+        if: inputs.version != '' && vars.JETBRAINS_MARKETPLACE_LISTED == 'true'
+        working-directory: jetbrains-plugin
+        env:
+          VERSION: ${{ inputs.version }}
+          CERTIFICATE_CHAIN_B64: ${{ secrets.JETBRAINS_CERTIFICATE_CHAIN }}
+          PRIVATE_KEY_B64: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
+          PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
+          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+        run: |
+          printf '%s' "$CERTIFICATE_CHAIN_B64" | base64 -d > sign-chain.crt
+          printf '%s' "$PRIVATE_KEY_B64" | base64 -d > sign-private.pem
+          export CERTIFICATE_CHAIN_FILE=sign-chain.crt PRIVATE_KEY_FILE=sign-private.pem
+          ./gradlew publishPlugin "-PpluginVersion=${VERSION#v}"
+
+  build-vs:
+    needs: test
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            language-server/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build language-server
+        run: |
+          npm --prefix language-server ci
+          npm --prefix language-server run build
+
+      - name: Copy language-server to VS extension
+        shell: bash
+        run: |
+          mkdir -p vs-extension/LanguageServer
+          cp -r language-server/out/* vs-extension/LanguageServer/
+          cp -r language-server/node_modules vs-extension/LanguageServer/
+
+      - name: Sync grammar + LICENSE
+        shell: bash
+        run: |
+          cp shared/syntaxes/qtn.tmLanguage.json vs-extension/Grammars/qtn.tmLanguage.json
+          cp LICENSE vs-extension/LICENSE
+
+      - name: Inject version
+        if: inputs.version != ''
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $ver = $env:VERSION -replace '^v', ''
+          $path = 'vs-extension/source.extension.vsixmanifest'
+          $content = Get-Content $path -Raw
+          $content = $content -replace '(<Identity\b[^>]*\bVersion=")[^"]*(")', "`${1}$ver`${2}"
+          Set-Content -Path $path -Value $content -NoNewline
+
+      - name: Build VS extension
+        working-directory: vs-extension
+        run: dotnet build -c Release
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          find vs-extension/bin/Release -name "*.vsix" -exec cp {} release/QtnLSP-vs.vsix \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vs-vsix
+          path: release/QtnLSP-vs.vsix
+          retention-days: 7

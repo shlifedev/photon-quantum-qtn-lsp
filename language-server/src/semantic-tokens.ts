@@ -57,7 +57,9 @@ function collectTypeReferences(def: Definition): TypeReference[] {
     refs.push(typeRef);
     // Recurse into generic args (e.g., list<CharacterState> → CharacterState)
     for (const arg of typeRef.genericArgs) {
-      addTypeRef(arg);
+      if ('name' in arg) {
+        addTypeRef(arg);
+      }
     }
   }
 

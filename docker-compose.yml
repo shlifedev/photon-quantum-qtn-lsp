@@ -23,7 +23,8 @@ services:
       service: builder
     command: >
       bash -c "
-        cd /workspace/vscode-extension && npm ci --prefer-offline && npm test
+        cd /workspace/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
+        cd /workspace/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap
       "
 
   vscode:
@@ -60,7 +61,8 @@ services:
         cp /workspace/shared/syntaxes/qtn.tmLanguage.json /workspace/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
         cp /workspace/shared/syntaxes/qtn.tmLanguage.json /workspace/vs-extension/Grammars/qtn.tmLanguage.json &&
         echo '=== Test ===' &&
-        cd /workspace/vscode-extension && npm ci --prefer-offline && npm test &&
+        cd /workspace/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
+        cd /workspace/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap &&
         echo '=== Build VSCode ===' &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/language-server && npm ci --prefer-offline &&

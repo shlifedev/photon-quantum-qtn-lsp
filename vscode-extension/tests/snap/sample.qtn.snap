@@ -479,7 +479,9 @@
 #      ^^^^^^^^^^^^^ source.qtn entity.name.type.qtn
 #                   ^^^ source.qtn
 >  entity_ref Player;
-#^^^^^^^^^^^^^^^^^^^^^ source.qtn
+#^^ source.qtn
+#  ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#            ^^^^^^^^^ source.qtn
 >  FP Damage;
 #^^ source.qtn
 #  ^^ source.qtn support.type.qtn
@@ -497,9 +499,13 @@
 #      ^^^^^^^^^^^^ source.qtn entity.name.type.qtn
 #                  ^^^ source.qtn
 >  entity_ref Item;
-#^^^^^^^^^^^^^^^^^^^ source.qtn
+#^^ source.qtn
+#  ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#            ^^^^^^^ source.qtn
 >  player_ref Player;
-#^^^^^^^^^^^^^^^^^^^^^ source.qtn
+#^^ source.qtn
+#  ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#            ^^^^^^^^^ source.qtn
 >  int Quantity;
 #^^ source.qtn
 #  ^^^ source.qtn support.type.qtn
@@ -521,7 +527,8 @@
 #      ^ source.qtn
 #       ^^^^^^^^^^^^^ source.qtn entity.name.type.qtn
 #                    ^ source.qtn punctuation.definition.parameters.begin.qtn
-#                     ^^^^^^^^^^^^^^^^^^^ source.qtn
+#                     ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#                               ^^^^^^^^^ source.qtn
 #                                        ^^^^^^^^^ source.qtn support.type.qtn
 #                                                 ^^^^^^^^^ source.qtn
 #                                                          ^ source.qtn punctuation.definition.parameters.end.qtn
@@ -531,7 +538,8 @@
 #      ^ source.qtn
 #       ^^^^^^^^^^^^^ source.qtn entity.name.type.qtn
 #                    ^ source.qtn punctuation.definition.parameters.begin.qtn
-#                     ^^^^^^^^^^^^^^^^^^^ source.qtn
+#                     ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#                               ^^^^^^^^^ source.qtn
 #                                        ^^ source.qtn support.type.qtn
 #                                          ^^^^^^^ source.qtn
 #                                                 ^ source.qtn punctuation.definition.parameters.end.qtn
@@ -542,7 +550,9 @@
 #       ^^^^^^^^ source.qtn entity.name.type.qtn
 #               ^ source.qtn punctuation.definition.parameters.begin.qtn
 #                ^^ source.qtn support.type.qtn
-#                  ^^^^^^^^^^^^^^^^^^^^^^^^^^ source.qtn
+#                  ^^^^^^^^^ source.qtn
+#                           ^^^^^^^^^^ source.qtn support.type.generic.qtn
+#                                     ^^^^^^^ source.qtn
 #                                            ^ source.qtn punctuation.definition.parameters.end.qtn
 #                                             ^^ source.qtn
 >

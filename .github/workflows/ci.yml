@@ -3,125 +3,14 @@ name: CI
 on:
   pull_request:
 
+# 같은 PR에 새 푸시가 오면 진행 중인 실행을 취소해 러너 시간을 아낀다.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  build-vscode:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            language-server/package-lock.json
-            vscode-extension/package-lock.json
-
-      - name: Install root workspace dependencies
-        run: npm ci
-
-      - name: Install language-server dependencies
-        working-directory: language-server
-        run: npm ci
-
-      - name: Install vscode-extension dependencies
-        working-directory: vscode-extension
-        run: npm ci
-
-      - name: Sync grammar
-        run: cp shared/syntaxes/qtn.tmLanguage.json vscode-extension/syntaxes/qtn.tmLanguage.json
-
-      - name: Language Server tests
-        working-directory: language-server
-        run: npm test
-
-      - name: Grammar tests
-        working-directory: vscode-extension
-        run: npm test
-
-      - name: Package VSIX
-        working-directory: vscode-extension
-        run: npx vsce package --no-dependencies
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vscode-vsix
-          path: vscode-extension/*.vsix
-
-  build-jetbrains:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            language-server/package-lock.json
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Install & build language-server
-        working-directory: language-server
-        run: npm ci && npm run build
-
-      - name: Sync grammar
-        run: cp shared/syntaxes/qtn.tmLanguage.json jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
-
-      - name: Build JetBrains plugin
-        working-directory: jetbrains-plugin
-        run: ./gradlew buildPlugin
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jetbrains-zip
-          path: jetbrains-plugin/build/distributions/*.zip
-
-  build-vs:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            language-server/package-lock.json
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Install & build language-server
-        working-directory: language-server
-        run: npm ci && npm run build
-
-      - name: Copy language-server to VS extension
-        shell: bash
-        run: |
-          mkdir -p vs-extension/LanguageServer
-          cp -r language-server/out/* vs-extension/LanguageServer/
-          cp -r language-server/node_modules vs-extension/LanguageServer/
-
-      - name: Sync grammar + LICENSE
-        shell: bash
-        run: |
-          cp shared/syntaxes/qtn.tmLanguage.json vs-extension/Grammars/qtn.tmLanguage.json
-          cp LICENSE vs-extension/LICENSE
-
-      - name: Build VS extension
-        working-directory: vs-extension
-        run: dotnet build -c Release
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vs-vsix
-          path: vs-extension/bin/Release/**/*.vsix
+  build:
+    uses: ./.github/workflows/build.yml

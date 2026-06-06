@@ -152,6 +152,9 @@ export class SymbolTable {
         this.processGlobalDefinition(def as GlobalDefinition, fileUri);
         break;
       case 'import':
+        this.imports.push(def as ImportDefinition);
+        this.processImportDefinition(def as ImportDefinition, fileUri);
+        break;
       case 'using':
         this.imports.push(def as ImportDefinition);
         break;
@@ -162,6 +165,48 @@ export class SymbolTable {
         // Skip pragma definitions - they don't create symbols
         break;
     }
+  }
+
+  private processImportDefinition(def: ImportDefinition, fileUri: string): void {
+    const existing = this.types.get(def.name);
+    if (existing && existing.source !== 'import') {
+      return;
+    }
+
+    const symbol: SymbolInfo = {
+      name: def.name,
+      kind: this.importKindToSymbolKind(def.importKind),
+      location: createLocation(fileUri, def.range),
+      detail: this.buildImportDetail(def),
+      children: [],
+      source: 'import',
+    };
+
+    this.types.set(def.name, symbol);
+  }
+
+  private importKindToSymbolKind(kind: ImportDefinition['importKind']): SymbolKind {
+    switch (kind) {
+      case 'struct':
+        return SymbolKind.Struct;
+      case 'enum':
+        return SymbolKind.Enum;
+      case 'singleton':
+      case 'component':
+      case 'type':
+      default:
+        return SymbolKind.Class;
+    }
+  }
+
+  private buildImportDetail(def: ImportDefinition): string {
+    if (def.importKind === 'struct' && def.size !== undefined) {
+      return `import struct (${def.size})`;
+    }
+    if (def.importKind === 'enum' && def.underlyingType) {
+      return `import enum (${def.underlyingType})`;
+    }
+    return `import ${def.importKind}`;
   }
 
   // Process type definition (component, struct, enum, flags, union, asset)

@@ -4,11 +4,18 @@ on:
   push:
     branches: [main]
 
+# 연속 푸시 시 릴리스를 순차 실행해 태그 계산/생성 경쟁을 막는다.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   version:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    timeout-minutes: 5
     outputs:
       new_version: ${{ steps.bump.outputs.new_version }}
       should_release: ${{ steps.bump.outputs.should_release }}
@@ -46,160 +53,24 @@ jobs:
 
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 
-  build-vscode:
+  build:
     needs: version
     if: needs.version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            language-server/package-lock.json
-            vscode-extension/package-lock.json
-
-      - name: Install root workspace dependencies
-        run: npm ci
-
-      - name: Install language-server dependencies
-        working-directory: language-server
-        run: npm ci
-
-      - name: Install vscode-extension dependencies
-        working-directory: vscode-extension
-        run: npm ci
-
-      - name: Sync grammar
-        run: cp shared/syntaxes/qtn.tmLanguage.json vscode-extension/syntaxes/qtn.tmLanguage.json
-
-      - name: Language Server tests
-        working-directory: language-server
-        run: npm test
-
-      - name: Grammar tests
-        working-directory: vscode-extension
-        run: npm test
-
-      - name: Package VSIX
-        working-directory: vscode-extension
-        run: npx vsce package --no-dependencies
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p release
-          cp vscode-extension/*.vsix release/QtnLSP-vscode.vsix
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vscode-vsix
-          path: release/QtnLSP-vscode.vsix
-
-  build-jetbrains:
-    needs: version
-    if: needs.version.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            language-server/package-lock.json
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Install & build language-server
-        working-directory: language-server
-        run: npm ci && npm run build
-
-      - name: Sync grammar
-        run: cp shared/syntaxes/qtn.tmLanguage.json jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
-
-      - name: Build JetBrains plugin
-        working-directory: jetbrains-plugin
-        run: ./gradlew buildPlugin
-
-      - name: Prepare artifact
-        run: |
-          mkdir -p release
-          cp jetbrains-plugin/build/distributions/*.zip release/QtnLSP-jetbrains.zip
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jetbrains-zip
-          path: release/QtnLSP-jetbrains.zip
-
-  build-vs:
-    needs: version
-    if: needs.version.outputs.should_release == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            language-server/package-lock.json
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
-      - name: Install & build language-server
-        working-directory: language-server
-        run: npm ci && npm run build
-
-      - name: Copy language-server to VS extension
-        shell: bash
-        run: |
-          mkdir -p vs-extension/LanguageServer
-          cp -r language-server/out/* vs-extension/LanguageServer/
-          cp -r language-server/node_modules vs-extension/LanguageServer/
-
-      - name: Sync grammar + LICENSE
-        shell: bash
-        run: |
-          cp shared/syntaxes/qtn.tmLanguage.json vs-extension/Grammars/qtn.tmLanguage.json
-          cp LICENSE vs-extension/LICENSE
-
-      - name: Build VS extension
-        working-directory: vs-extension
-        run: dotnet build -c Release
-
-      - name: Prepare artifact
-        shell: bash
-        run: |
-          mkdir -p release
-          find vs-extension/bin/Release -name "*.vsix" -exec cp {} release/QtnLSP-vs.vsix \;
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vs-vsix
-          path: release/QtnLSP-vs.vsix
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.new_version }}
+    secrets:
+      JETBRAINS_CERTIFICATE_CHAIN: ${{ secrets.JETBRAINS_CERTIFICATE_CHAIN }}
+      JETBRAINS_PRIVATE_KEY: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
+      JETBRAINS_PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
+      JETBRAINS_PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
   release:
-    needs: [version, build-vscode, build-jetbrains, build-vs]
+    needs: [version, build]
     if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
