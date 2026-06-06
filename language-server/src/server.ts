@@ -11,6 +11,9 @@ import {
   FileChangeType,
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
+import { promises as fs, type Dirent } from 'fs';
+import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { ProjectModel } from './project-model.js';
 import { handleDefinition } from './definition.js';
 import { handleCompletion } from './completion.js';
@@ -27,9 +30,12 @@ const documents = new TextDocuments(TextDocument);
 
 // Create project model to manage .qtn files and symbols
 const projectModel = new ProjectModel();
+let workspaceRoots: string[] = [];
 
 // Initialize handler - declare server capabilities
 connection.onInitialize((params: InitializeParams): InitializeResult => {
+  workspaceRoots = getWorkspaceRoots(params);
+
   // Read locale from initialization options
   const options = params.initializationOptions as { locale?: string } | undefined;
   if (options?.locale?.startsWith('ko')) {
@@ -71,14 +77,18 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   };
 });
 
+connection.onInitialized(() => {
+  void indexWorkspaceFiles();
+});
+
 // Document change handler - update project model when documents change
 documents.onDidChangeContent((change) => {
   projectModel.updateDocument(change.document.uri, change.document.getText());
 });
 
-// Document close handler - remove document from project model
+// Document close handler - keep workspace files indexed from disk.
 documents.onDidClose((event) => {
-  projectModel.removeDocument(event.document.uri);
+  void reloadClosedDocument(event.document.uri);
 });
 
 // Handle workspace file changes (external edits, file creation/deletion)
@@ -92,13 +102,143 @@ connection.onDidChangeWatchedFiles((params) => {
         break;
       case FileChangeType.Created:
       case FileChangeType.Changed:
-        // For external changes, we rely on the document sync
-        // The IDE will send didOpen/didChangeContent for open documents
-        // For non-open files, we'd need to read them - skip for now
+        if (!documents.get(change.uri)) {
+          void loadFileIntoProject(change.uri);
+        }
         break;
     }
   }
 });
+
+function getWorkspaceRoots(params: InitializeParams): string[] {
+  const roots: string[] = [];
+
+  for (const folder of params.workspaceFolders ?? []) {
+    const filePath = uriToFilePath(folder.uri);
+    if (filePath) {
+      roots.push(filePath);
+    }
+  }
+
+  if (roots.length === 0 && params.rootUri) {
+    const filePath = uriToFilePath(params.rootUri);
+    if (filePath) {
+      roots.push(filePath);
+    }
+  }
+
+  if (roots.length === 0 && params.rootPath) {
+    roots.push(params.rootPath);
+  }
+
+  return roots;
+}
+
+async function indexWorkspaceFiles(): Promise<void> {
+  for (const root of workspaceRoots) {
+    try {
+      const files = await findQtnFiles(root);
+      await Promise.all(files.map((file) => loadFileIntoProject(pathToFileURL(file).toString())));
+    } catch (error) {
+      connection.console.warn(`Failed to index QTN workspace '${root}': ${formatError(error)}`);
+    }
+  }
+}
+
+async function reloadClosedDocument(uri: string): Promise<void> {
+  if (!uri.startsWith('file:')) {
+    projectModel.removeDocument(uri);
+    return;
+  }
+
+  await loadFileIntoProject(uri);
+}
+
+async function loadFileIntoProject(uri: string): Promise<void> {
+  const openDocument = documents.get(uri);
+  if (openDocument) {
+    projectModel.updateDocument(uri, openDocument.getText());
+    return;
+  }
+
+  const filePath = uriToFilePath(uri);
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    const text = await fs.readFile(filePath, 'utf8');
+    projectModel.updateDocument(uri, text);
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      projectModel.removeDocument(uri);
+      return;
+    }
+
+    connection.console.warn(`Failed to read QTN file '${uri}': ${formatError(error)}`);
+  }
+}
+
+async function findQtnFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+
+  async function visit(dir: string): Promise<void> {
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!shouldSkipDirectory(entry.name)) {
+          await visit(fullPath);
+        }
+        continue;
+      }
+
+      if (entry.isFile() && entry.name.endsWith('.qtn')) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await visit(root);
+  return files;
+}
+
+function shouldSkipDirectory(name: string): boolean {
+  return name === '.git' ||
+    name === 'node_modules' ||
+    name === 'dist' ||
+    name === 'out' ||
+    name === 'build';
+}
+
+function uriToFilePath(uri: string): string | null {
+  if (!uri.startsWith('file:')) {
+    return null;
+  }
+
+  try {
+    return fileURLToPath(uri);
+  } catch {
+    return null;
+  }
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: string }).code === 'ENOENT';
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 // ============================================================================
 // LSP REQUEST HANDLERS (STUBS - will be implemented in Phase 3-6)

@@ -1,10 +1,18 @@
-import { SignalDefinition, TypeDefinition, EventDefinition, TypeReference } from './ast.js';
+import { SignalDefinition, TypeDefinition, EventDefinition, TypeArgument, TypeReference } from './ast.js';
+
+function formatTypeArgument(arg: TypeArgument): string {
+  if (!('name' in arg)) {
+    return arg.raw;
+  }
+
+  return formatTypeReference(arg);
+}
 
 export function formatTypeReference(typeRef: TypeReference): string {
   let result = typeRef.name;
 
   if (typeRef.genericArgs.length > 0) {
-    const args = typeRef.genericArgs.map((arg) => formatTypeReference(arg)).join(', ');
+    const args = typeRef.genericArgs.map((arg) => formatTypeArgument(arg)).join(', ');
     result += `<${args}>`;
   }
 
@@ -13,7 +21,7 @@ export function formatTypeReference(typeRef: TypeReference): string {
   }
 
   if (typeRef.isPointer) {
-    result = `*${result}`;
+    result += '*';
   }
 
   return result;
@@ -43,10 +51,7 @@ export function buildEventDetail(def: EventDefinition): string {
 
 export function buildSignalDetail(def: SignalDefinition): string {
   const paramTypes = def.parameters
-    .map((p) => {
-      const pointerPrefix = p.typeRef.isPointer ? '*' : '';
-      return `${pointerPrefix}${formatTypeReference(p.typeRef)}`;
-    })
+    .map((p) => formatTypeReference(p.typeRef))
     .join(', ');
 
   return `signal(${paramTypes})`;

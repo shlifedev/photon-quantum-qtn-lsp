@@ -21,16 +21,12 @@ Commands:
   vscode          Build VSCode extension (.vsix)
   vscode-install  Build + install VSCode extension
   jetbrains       Build JetBrains plugin (.zip)
-  all             Sync + test + build all plugins
+  vs              Build Visual Studio extension (.vsix, Windows/.NET SDK)
+  all             Sync + test + build VSCode and JetBrains plugins
   clean           Remove build artifacts
 
 EOF
 }
-
-if ! command -v docker &>/dev/null; then
-    error "Docker is required. Install Docker and try again."
-    exit 1
-fi
 
 dc() {
     docker compose -f "$SCRIPT_DIR/docker-compose.yml" "$@"
@@ -38,6 +34,10 @@ dc() {
 
 # Build image only if Dockerfile changed
 ensure_image() {
+    if ! command -v docker &>/dev/null; then
+        error "Docker is required for this command. Install Docker and try again."
+        exit 1
+    fi
     dc build builder
 }
 
@@ -53,6 +53,33 @@ cmd_clean() {
     rm -rf "$SCRIPT_DIR/vs-extension/obj"
     rm -rf "$SCRIPT_DIR/vs-extension/LanguageServer"
     log "Clean complete."
+}
+
+cmd_vs() {
+    if ! command -v npm &>/dev/null; then
+        error "npm is required to build the Visual Studio extension."
+        exit 1
+    fi
+    if ! command -v dotnet &>/dev/null; then
+        error "dotnet SDK is required to build the Visual Studio extension."
+        exit 1
+    fi
+
+    log "Building QTN Language Server for Visual Studio..."
+    npm --prefix "$SCRIPT_DIR/language-server" ci --prefer-offline
+    npm --prefix "$SCRIPT_DIR/language-server" run build
+
+    log "Building Visual Studio extension..."
+    dotnet build "$SCRIPT_DIR/vs-extension/QtnLanguageExtension.csproj" -c Release
+
+    mkdir -p "$SCRIPT_DIR/dist/vs"
+    VSIX=$(find "$SCRIPT_DIR/vs-extension/bin" -name '*.vsix' -type f 2>/dev/null | sort | tail -1)
+    if [ -z "$VSIX" ]; then
+        error "No .vsix file was produced. Visual Studio VSIX packaging usually requires Windows."
+        exit 1
+    fi
+    cp "$VSIX" "$SCRIPT_DIR/dist/vs/"
+    log "Visual Studio extension built -> dist/vs/"
 }
 
 COMMAND="${1:-}"
@@ -99,6 +126,9 @@ case "$COMMAND" in
         log "Building JetBrains plugin..."
         dc run --rm jetbrains
         log "JetBrains plugin built -> dist/jetbrains/"
+        ;;
+    vs)
+        cmd_vs
         ;;
     all)
         ensure_image

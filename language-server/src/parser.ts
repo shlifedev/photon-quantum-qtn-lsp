@@ -7,6 +7,7 @@ import {
   type SourceRange,
   type Position,
   type TypeReference,
+  type TypeArgument,
   type Attribute,
   type QtnAstNode,
   type FieldDefinition,
@@ -267,10 +268,19 @@ class Parser {
           if (this.check(TokenType.keyword, 'event')) {
             return this.parseEvent(['abstract'], attributes, absTok.range);
           }
+          if (this.check(TokenType.keyword, 'singleton')) {
+            this.advance();
+            if (this.check(TokenType.keyword, 'component')) {
+              return this.parseComponent(true, ['abstract'], attributes, absTok.range);
+            }
+            this.addError("Expected 'component' after 'abstract singleton'", this.current().range);
+            this.skipToRecoveryPoint();
+            return null;
+          }
           if (this.check(TokenType.keyword, 'component')) {
             return this.parseComponent(false, ['abstract'], attributes, absTok.range);
           }
-          this.addError("Expected 'event' or 'component' after 'abstract'", this.current().range);
+          this.addError("Expected 'event', 'component', or 'singleton component' after 'abstract'", this.current().range);
           this.skipToRecoveryPoint();
           return null;
         }
@@ -386,6 +396,12 @@ class Parser {
     const startRange = leadingRange ?? kwTok.range;
 
     const name = this.expectIdentifierOrKeyword('component name');
+
+    let baseType: string | undefined;
+    if (this.match(TokenType.punctuation, ':')) {
+      baseType = this.expectIdentifierOrKeyword('base component name').value;
+    }
+
     const fields = this.parseFieldBlock();
     const endRange = this.prevRange();
 
@@ -398,6 +414,7 @@ class Parser {
       modifiers,
       fields,
       enumMembers: [],
+      baseType,
       range: this.makeRange(startRange, endRange),
       fileUri: this.fileUri,
     };
@@ -995,7 +1012,7 @@ class Parser {
     const nameRange = this.makeRange(startRange, this.prevRange());
 
     // Generic args: <T>, <K,V>, <T>[N]
-    let genericArgs: TypeReference[] = [];
+    let genericArgs: TypeArgument[] = [];
     if (this.match(TokenType.punctuation, '<')) {
       if (depth >= MAX_GENERIC_DEPTH) {
         this.addError('Generic type nesting too deep', this.current().range);
@@ -1048,9 +1065,9 @@ class Parser {
     };
   }
 
-  /** Parse comma-separated type references inside < > */
-  private parseGenericArgs(depth: number = 0): TypeReference[] {
-    const args: TypeReference[] = [];
+  /** Parse comma-separated type or numeric arguments inside < > */
+  private parseGenericArgs(depth: number = 0): TypeArgument[] {
+    const args: TypeArgument[] = [];
 
     // Empty generic args (shouldn't happen in valid QTN but handle gracefully)
     if (this.check(TokenType.punctuation, '>')) {
@@ -1058,12 +1075,12 @@ class Parser {
     }
 
     while (!this.isEof()) {
-      const ref = this.parseTypeRef(depth + 1);
-      if (!ref) {
+      const arg = this.parseGenericArg(depth + 1);
+      if (!arg) {
         this.addError('Expected type argument', this.current().range);
         break;
       }
-      args.push(ref);
+      args.push(arg);
 
       if (!this.match(TokenType.punctuation, ',')) {
         break;
@@ -1071,6 +1088,20 @@ class Parser {
     }
 
     return args;
+  }
+
+  private parseGenericArg(depth: number): TypeArgument | null {
+    if (this.check(TokenType.number)) {
+      const tok = this.advance();
+      return {
+        kind: 'number',
+        value: this.parseNumericValue(tok.value),
+        raw: tok.value,
+        range: tok.range,
+      };
+    }
+
+    return this.parseTypeRef(depth);
   }
 
   // ── Attribute list ─────────────────────────────────────────────
@@ -1172,13 +1203,16 @@ class Parser {
 
   /** Parse a numeric string (int, float, hex) into a number. */
   private parseNumericValue(raw: string): number {
-    if (raw.startsWith('0x') || raw.startsWith('0X')) {
-      return parseInt(raw, 16);
+    const sign = raw.startsWith('-') ? -1 : 1;
+    const unsigned = sign < 0 ? raw.substring(1) : raw;
+
+    if (unsigned.startsWith('0x') || unsigned.startsWith('0X')) {
+      return sign * parseInt(unsigned, 16);
     }
-    if (raw.includes('.')) {
-      return parseFloat(raw);
+    if (unsigned.includes('.')) {
+      return sign * parseFloat(unsigned);
     }
-    return parseInt(raw, 10);
+    return sign * parseInt(unsigned, 10);
   }
 }
 
