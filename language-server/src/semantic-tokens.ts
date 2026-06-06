@@ -144,11 +144,18 @@ export function handleSemanticTokensFull(
 
       const tokenType = symbolKindToTokenType(symbol.kind);
 
-      // Use name.length for correct token length (handles multiline dotted names)
+      // Derive length from nameRange so it stays correct regardless of how the
+      // name was stored (e.g. nullable types). Fall back to name.length for
+      // multiline dotted names where columns span lines.
+      const { start, end } = typeRef.nameRange;
+      const length = start.line === end.line
+        ? end.character - start.character
+        : typeRef.name.length;
+
       tokens.push({
-        line: typeRef.nameRange.start.line,
-        char: typeRef.nameRange.start.character,
-        length: typeRef.name.length,
+        line: start.line,
+        char: start.character,
+        length,
         tokenType,
         tokenModifiers: 0,
       });

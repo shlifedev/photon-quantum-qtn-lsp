@@ -43,6 +43,18 @@ component P {
     expect(value).toContain('test.qtn');
   });
 
+  it('resolves a nullable user-defined type to its declaration site', () => {
+    const source = `struct Stats { }
+component P {
+  Stats? S;
+}`;
+    // Cursor on 'Stats' in the nullable field type.
+    const value = hoverText(source, 2, 4);
+    expect(value).not.toBeNull();
+    // Keeping the original name (not 'NullableStats') lets the lookup resolve.
+    expect(value).toContain('test.qtn');
+  });
+
   it('returns null when the cursor is not on an identifier', () => {
     // Leading blank line: offset 0 sits on a newline, no identifier to resolve.
     expect(hoverText('\ncomponent P {}', 0, 0)).toBeNull();

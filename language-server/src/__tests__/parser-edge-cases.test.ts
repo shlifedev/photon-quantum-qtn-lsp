@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '../parser.js';
+import { TypeDefinition } from '../ast.js';
 
 describe('Parser Edge Cases', () => {
   it('should handle empty files without errors', () => {
@@ -192,5 +193,24 @@ describe('Parser Edge Cases', () => {
 
     // Will have errors
     expect(result.parseErrors.length).toBeGreaterThan(0);
+  });
+
+  it('should record nullable suffix without mutating the type name', () => {
+    const result = parse('struct S { FP? Maybe; }', 'test://nullable.qtn');
+    const struct = result.definitions.find(d => d.kind === 'struct') as TypeDefinition;
+    const typeRef = struct.fields[0].typeRef;
+
+    // Name stays the source name (NOT 'NullableFP') so symbol lookups resolve.
+    expect(typeRef.name).toBe('FP');
+    expect(typeRef.isNullable).toBe(true);
+    // nameRange covers only 'FP', not the trailing '?'.
+    const nameLen = typeRef.nameRange.end.character - typeRef.nameRange.start.character;
+    expect(nameLen).toBe('FP'.length);
+  });
+
+  it('should leave isNullable false for non-nullable types', () => {
+    const result = parse('struct S { FP Value; }', 'test://non-nullable.qtn');
+    const struct = result.definitions.find(d => d.kind === 'struct') as TypeDefinition;
+    expect(struct.fields[0].typeRef.isNullable).toBe(false);
   });
 });
