@@ -18,18 +18,17 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 
 ## 설치
 
-[GitHub Releases](../../releases)에서 최신 빌드를 다운로드하세요.
+### VSCode
+- **마켓플레이스**: [Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — 또는 VSCode **확장(Extensions)** 뷰에서 `Quantum DSL (QTN)` 검색.
+- **CLI**: `code --install-extension shlifedev.qtn-syntax-highlighting`
 
-**VSCode**
-```bash
-code --install-extension qtn-syntax-highlighting-<version>.vsix
-```
+### Visual Studio 2022
+- **마켓플레이스**: [Quantum DSL (QTN) Language Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.QtnLanguageSupport) — 또는 Visual Studio에서 **Extensions → Manage Extensions → Online**으로 들어가 `Quantum DSL (QTN)` 검색.
 
-**JetBrains Rider**
-Settings > Plugins > Install Plugin from Disk > `.zip` 파일 선택.
+### JetBrains Rider
+- [GitHub Releases](../../releases)에서 `QtnLSP-jetbrains.zip`를 받은 뒤 **Settings → Plugins → ⚙ → Install Plugin from Disk**. _(마켓플레이스 등록 예정)_
 
-**Visual Studio 2022**
-다운로드한 `.vsix` 파일을 더블클릭하여 설치.
+> 수동 설치를 원하면 모든 빌드가 [GitHub Releases](../../releases)에 `.vsix` / `.zip`으로 첨부돼 있습니다.
 
 ## 빌드
 

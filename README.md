@@ -18,18 +18,17 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 
 ## Installation
 
-Download the latest build from [GitHub Releases](../../releases).
+### VSCode
+- **Marketplace**: [Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — or open the **Extensions** view in VSCode and search for `Quantum DSL (QTN)`.
+- **CLI**: `code --install-extension shlifedev.qtn-syntax-highlighting`
 
-**VSCode**
-```bash
-code --install-extension qtn-syntax-highlighting-<version>.vsix
-```
+### Visual Studio 2022
+- **Marketplace**: [Quantum DSL (QTN) Language Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.QtnLanguageSupport) — or in Visual Studio go to **Extensions → Manage Extensions → Online** and search for `Quantum DSL (QTN)`.
 
-**JetBrains Rider**
-Settings > Plugins > Install Plugin from Disk > select the `.zip` file.
+### JetBrains Rider
+- Download `QtnLSP-jetbrains.zip` from [GitHub Releases](../../releases), then **Settings → Plugins → ⚙ → Install Plugin from Disk**. _(Marketplace listing coming soon.)_
 
-**Visual Studio 2022**
-Double-click the downloaded `.vsix` file to install.
+> Prefer a manual install? Every build is attached to [GitHub Releases](../../releases) as a `.vsix` / `.zip`.
 
 ## Build
 
