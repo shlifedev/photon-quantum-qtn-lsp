@@ -12,24 +12,24 @@ import { SymbolTable, SymbolInfo } from './symbol-table.js';
  * - A map of URI -> parsed QtnDocument
  * - A unified SymbolTable aggregating symbols from all documents
  *
- * When documents change, the symbol table is rebuilt from scratch to ensure consistency.
+ * Symbol-table updates are incremental: a changed document only re-indexes its
+ * own symbols, and builtins are computed once and reused. Removing a document
+ * drops only that document's symbols.
  */
 export class ProjectModel {
   private documents: Map<string, QtnDocument>;
   private symbolTable: SymbolTable;
-  private dirty: boolean;
 
   constructor() {
     this.documents = new Map();
     this.symbolTable = new SymbolTable();
-    this.dirty = false;
     // Pre-populate with built-in types
     this.symbolTable.mergeBuiltins();
   }
 
   /**
-   * Update a document: re-parse the text and mark symbol table as dirty.
-   * The symbol table will be lazily rebuilt on next access.
+   * Update a document: re-parse the text and re-index only this document's
+   * symbols into the shared symbol table.
    * @param uri - Document URI
    * @param text - Full document text
    */
@@ -54,19 +54,17 @@ export class ProjectModel {
     // Store in documents map
     this.documents.set(uri, doc);
 
-    // Mark symbol table as dirty for lazy rebuild
-    this.dirty = true;
+    // Re-index only this document; other documents and builtins are untouched.
+    this.symbolTable.addFromDocument(doc);
   }
 
   /**
-   * Remove a document from the project model.
+   * Remove a document from the project model along with its symbols.
    * @param uri - Document URI to remove
    */
   removeDocument(uri: string): void {
     this.documents.delete(uri);
-
-    // Mark symbol table as dirty for lazy rebuild
-    this.dirty = true;
+    this.symbolTable.removeDocument(uri);
   }
 
   /**
@@ -88,12 +86,9 @@ export class ProjectModel {
 
   /**
    * Get all symbols from the symbol table.
-   * Rebuilds the symbol table if it's marked as dirty.
    * @returns Array of all SymbolInfo objects
    */
   getAllSymbols(): SymbolInfo[] {
-    this.ensureSymbolTableFresh();
-
     const symbols: SymbolInfo[] = [];
 
     // Collect all type symbols
@@ -111,13 +106,10 @@ export class ProjectModel {
 
   /**
    * Find the definition location of a symbol by name.
-   * Rebuilds the symbol table if it's marked as dirty.
    * @param name - Symbol name to look up
    * @returns Location if found and user-defined, null otherwise
    */
   findDefinition(name: string): Location | null {
-    this.ensureSymbolTableFresh();
-
     const symbol = this.symbolTable.lookup(name);
 
     // Only return user-defined symbols (not builtins or imports)
@@ -130,39 +122,9 @@ export class ProjectModel {
 
   /**
    * Get the symbol table for direct access by handlers.
-   * Rebuilds the symbol table if it's marked as dirty.
    * @returns The SymbolTable instance
    */
   getSymbolTable(): SymbolTable {
-    this.ensureSymbolTableFresh();
     return this.symbolTable;
-  }
-
-  /**
-   * Ensure the symbol table is fresh, rebuilding if necessary.
-   * This is called by all methods that access the symbol table.
-   */
-  private ensureSymbolTableFresh(): void {
-    if (this.dirty) {
-      this.rebuildSymbolTable();
-      this.dirty = false;
-    }
-  }
-
-  /**
-   * Rebuild the symbol table from all documents.
-   * This creates a fresh symbol table, merges builtins, then adds symbols from each document.
-   */
-  private rebuildSymbolTable(): void {
-    // Create new symbol table
-    this.symbolTable = new SymbolTable();
-
-    // Pre-populate with built-ins
-    this.symbolTable.mergeBuiltins();
-
-    // Add symbols from each document
-    for (const doc of this.documents.values()) {
-      this.symbolTable.addFromDocument(doc);
-    }
   }
 }

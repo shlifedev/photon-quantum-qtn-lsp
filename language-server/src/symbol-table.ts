@@ -93,28 +93,223 @@ function createLocation(fileUri: string, sourceRange: SourceRange): Location {
   };
 }
 
+// Builtin symbols are identical for every SymbolTable instance and only vary by
+// locale (which affects descriptions). Build them once per locale and reuse the
+// cached array so a single document edit never rebuilds ~40 builtins from scratch.
+const builtinSymbolCache = new Map<string, SymbolInfo[]>();
+
+// What a single document contributed to the merged symbol table. Caching the
+// already-built SymbolInfo objects lets us re-derive the merged view on removal
+// without re-processing every other document's AST.
+interface DocumentContribution {
+  types: SymbolInfo[];
+  constants: SymbolInfo[];
+  imports: ImportDefinition[];
+}
+
+// Map a builtin's category to its LSP SymbolKind.
+function builtinSymbolKind(category: BuiltinTypeInfo['category']): SymbolKind {
+  switch (category) {
+    case 'primitive':
+      return SymbolKind.Struct;
+    case 'quantum':
+    case 'collection':
+    case 'special':
+    default:
+      return SymbolKind.Class;
+  }
+}
+
+function createBuiltinSymbol(builtin: BuiltinTypeInfo): SymbolInfo {
+  return {
+    name: builtin.name,
+    kind: builtinSymbolKind(builtin.category),
+    location: {
+      uri: 'builtin://',
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+    },
+    detail: getDescription(builtin, getLocale()),
+    children: [],
+    source: 'builtin',
+  };
+}
+
+// Builtin symbols for the active locale, computed once and memoized per locale.
+function getBuiltinSymbols(): SymbolInfo[] {
+  const locale = getLocale();
+  let symbols = builtinSymbolCache.get(locale);
+  if (!symbols) {
+    symbols = ALL_BUILTIN_TYPES.map(createBuiltinSymbol);
+    builtinSymbolCache.set(locale, symbols);
+  }
+  return symbols;
+}
+
 // Symbol Table class
 export class SymbolTable {
   types: Map<string, SymbolInfo> = new Map();
   constants: Map<string, SymbolInfo> = new Map();
   imports: ImportDefinition[] = [];
 
-  // Build symbol table from parsed QTN document
-  buildFromDocument(doc: QtnDocument): void {
-    this.types.clear();
-    this.constants.clear();
-    this.imports = [];
+  // Per-document contributions, in insertion order. Used to re-derive the merged
+  // maps incrementally when a single document is added, updated, or removed.
+  private contributions: Map<string, DocumentContribution> = new Map();
+  private builtinsMerged = false;
 
+  // Build symbol table from a single document, discarding any prior state.
+  buildFromDocument(doc: QtnDocument): void {
+    const hadBuiltins = this.builtinsMerged;
+    this.contributions.clear();
+    this.indexDocument(doc);
+    this.builtinsMerged = hadBuiltins;
+    this.rebuildMergedView();
+  }
+
+  // Add symbols from a document WITHOUT clearing existing symbols.
+  // Re-indexing the same uri replaces only that document's contribution; symbols
+  // from other documents and the builtins are left untouched.
+  addFromDocument(doc: QtnDocument): void {
+    const previous = this.contributions.get(doc.uri);
+    this.indexDocument(doc);
+    const next = this.contributions.get(doc.uri)!;
+
+    // Re-editing a document can drop names it used to define (un-shadowing a
+    // builtin or another document) or collide with another document's winner —
+    // those cases can't be resolved by a forward merge alone, so fall back to a
+    // re-derive. The re-derive only iterates cached SymbolInfo objects, never
+    // re-parses.
+    if (this.needsFullRederive(doc.uri, previous, next)) {
+      this.rebuildMergedView();
+      return;
+    }
+
+    // Common keystroke case: this document's names are a superset of before and
+    // don't collide with other documents, so applying its fresh symbols on top
+    // keeps last-write-wins correct without touching any other document.
+    // O(symbols in this one document).
+    this.applyContribution(next);
+  }
+
+  // Drop a single document's symbols. Because removal can un-shadow builtins or
+  // symbols from other documents, the merged maps are re-derived from the cached
+  // contributions rather than mutated in place.
+  removeDocument(uri: string): void {
+    if (!this.contributions.delete(uri)) {
+      return;
+    }
+    this.rebuildMergedView();
+  }
+
+  // A forward-only merge writes this document's fresh symbols straight into the
+  // live maps. That is only valid when it can't disturb another source's winner,
+  // so we fall back to a full re-derive (which still reuses cached SymbolInfo,
+  // never re-parses) in these cases:
+  //   - the re-edit removed a name it used to define (may un-shadow a builtin or
+  //     another document),
+  //   - the document declared imports (appended into a shared array; a clean
+  //     rebuild avoids leaving stale entries),
+  //   - one of the document's names is currently owned by a *different* document
+  //     (forward-merging would override that document's winner and break the
+  //     insertion-order last-write-wins rule).
+  private needsFullRederive(
+    uri: string,
+    previous: DocumentContribution | undefined,
+    next: DocumentContribution,
+  ): boolean {
+    if (previous?.imports.length || next.imports.length) {
+      return true;
+    }
+
+    if (previous) {
+      const nextTypeNames = new Set(next.types.map((s) => s.name));
+      for (const symbol of previous.types) {
+        if (!nextTypeNames.has(symbol.name)) {
+          return true;
+        }
+      }
+      const nextConstNames = new Set(next.constants.map((s) => s.name));
+      for (const symbol of previous.constants) {
+        if (!nextConstNames.has(symbol.name)) {
+          return true;
+        }
+      }
+    }
+
+    for (const symbol of next.types) {
+      if (this.ownedByOtherDocument(this.types.get(symbol.name), uri)) {
+        return true;
+      }
+    }
+    for (const symbol of next.constants) {
+      if (this.ownedByOtherDocument(this.constants.get(symbol.name), uri)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // True when the current winner for a name belongs to a different document, so a
+  // forward merge must not clobber it. Builtins (and an absent winner) are safe to
+  // overwrite by a user/import symbol, matching last-write-wins.
+  private ownedByOtherDocument(current: SymbolInfo | undefined, uri: string | undefined): boolean {
+    if (!current || current.source === 'builtin') {
+      return false;
+    }
+    return current.location.uri !== uri;
+  }
+
+  // Process the document's definitions into cached SymbolInfo objects, replacing
+  // any prior contribution for the same uri.
+  private indexDocument(doc: QtnDocument): void {
+    this.current = { types: [], constants: [], imports: [] };
     for (const def of doc.definitions) {
       this.processDefinition(def, doc.uri);
     }
+    this.contributions.set(doc.uri, this.current);
+    this.current = null;
   }
 
-  // Add symbols from a document WITHOUT clearing existing symbols
-  // Used by ProjectModel to incrementally build symbol table from multiple documents
-  addFromDocument(doc: QtnDocument): void {
-    for (const def of doc.definitions) {
-      this.processDefinition(def, doc.uri);
+  // Active contribution being populated by processDefinition during indexDocument.
+  private current: DocumentContribution | null = null;
+
+  // Re-derive the merged maps from builtins + all cached contributions, in
+  // insertion order so user definitions win over builtins and later documents
+  // win over earlier ones — exactly matching the previous full rebuild. Cheap
+  // because it reuses already-built SymbolInfo objects and cached builtins.
+  private rebuildMergedView(): void {
+    this.types = new Map();
+    this.constants = new Map();
+    this.imports = [];
+
+    if (this.builtinsMerged) {
+      for (const symbol of getBuiltinSymbols()) {
+        this.types.set(symbol.name, symbol);
+      }
+    }
+
+    for (const contribution of this.contributions.values()) {
+      this.applyContribution(contribution);
+    }
+  }
+
+  private applyContribution(contribution: DocumentContribution): void {
+    for (const symbol of contribution.types) {
+      // Imports never override an already-resolved non-import symbol (builtin,
+      // user, or import from another document) — same rule as the old inline
+      // processImportDefinition check.
+      if (symbol.source === 'import') {
+        const existing = this.types.get(symbol.name);
+        if (existing && existing.source !== 'import') {
+          continue;
+        }
+      }
+      this.types.set(symbol.name, symbol);
+    }
+    for (const symbol of contribution.constants) {
+      this.constants.set(symbol.name, symbol);
+    }
+    for (const imp of contribution.imports) {
+      this.imports.push(imp);
     }
   }
 
@@ -142,11 +337,11 @@ export class SymbolTable {
         this.processGlobalDefinition(def as GlobalDefinition, fileUri);
         break;
       case 'import':
-        this.imports.push(def as ImportDefinition);
+        this.emitImport(def as ImportDefinition);
         this.processImportDefinition(def as ImportDefinition, fileUri);
         break;
       case 'using':
-        this.imports.push(def as ImportDefinition);
+        this.emitImport(def as ImportDefinition);
         break;
       case 'define':
         this.processDefineDefinition(def as DefineDefinition, fileUri);
@@ -157,12 +352,9 @@ export class SymbolTable {
     }
   }
 
+  // Emit an import symbol into the current contribution. The decision to skip it
+  // when a non-import symbol already wins is applied later in applyContribution.
   private processImportDefinition(def: ImportDefinition, fileUri: string): void {
-    const existing = this.types.get(def.name);
-    if (existing && existing.source !== 'import') {
-      return;
-    }
-
     const symbol: SymbolInfo = {
       name: def.name,
       kind: this.importKindToSymbolKind(def.importKind),
@@ -172,7 +364,20 @@ export class SymbolTable {
       source: 'import',
     };
 
-    this.types.set(def.name, symbol);
+    this.emitType(symbol);
+  }
+
+  // Collect emitted symbols into the contribution being indexed.
+  private emitType(symbol: SymbolInfo): void {
+    this.current?.types.push(symbol);
+  }
+
+  private emitConstant(symbol: SymbolInfo): void {
+    this.current?.constants.push(symbol);
+  }
+
+  private emitImport(def: ImportDefinition): void {
+    this.current?.imports.push(def);
   }
 
   private importKindToSymbolKind(kind: ImportDefinition['importKind']): SymbolKind {
@@ -228,7 +433,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.emitType(symbol);
   }
 
   // Process event definition
@@ -252,7 +457,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.emitType(symbol);
   }
 
   // Process signal definition
@@ -268,7 +473,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.emitType(symbol);
   }
 
   // Process input definition
@@ -290,7 +495,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set('input', symbol);
+    this.emitType(symbol);
   }
 
   // Process global definition
@@ -312,7 +517,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set('global', symbol);
+    this.emitType(symbol);
   }
 
   // Process #define constant
@@ -326,7 +531,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.constants.set(def.name, symbol);
+    this.emitConstant(symbol);
   }
 
   // Create field symbol
@@ -355,48 +560,16 @@ export class SymbolTable {
     };
   }
 
-  // Pre-populate symbol table with built-in types
+  // Pre-populate symbol table with built-in types. Reuses the per-locale cached
+  // builtin symbols instead of recreating them on every call.
   mergeBuiltins(): void {
-    for (const builtin of ALL_BUILTIN_TYPES) {
-      const symbol = this.createBuiltinSymbol(builtin);
+    this.builtinsMerged = true;
+    for (const symbol of getBuiltinSymbols()) {
       // Don't overwrite user-defined types
       if (!this.types.has(symbol.name)) {
         this.types.set(symbol.name, symbol);
       }
     }
-  }
-
-  // Create symbol from builtin type info
-  private createBuiltinSymbol(builtin: BuiltinTypeInfo): SymbolInfo {
-    let kind: SymbolKind;
-    switch (builtin.category) {
-      case 'primitive':
-        kind = SymbolKind.Struct;
-        break;
-      case 'quantum':
-        kind = SymbolKind.Class;
-        break;
-      case 'collection':
-        kind = SymbolKind.Class;
-        break;
-      case 'special':
-        kind = SymbolKind.Class;
-        break;
-      default:
-        kind = SymbolKind.Class;
-    }
-
-    return {
-      name: builtin.name,
-      kind,
-      location: {
-        uri: 'builtin://',
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
-      },
-      detail: getDescription(builtin, getLocale()),
-      children: [],
-      source: 'builtin',
-    };
   }
 
   // Lookup symbol by exact name
