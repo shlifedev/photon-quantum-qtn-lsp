@@ -10,6 +10,19 @@ NC='\033[0m'
 log()   { echo -e "${GREEN}[install]${NC} $*"; }
 error() { echo -e "${RED}[error]${NC} $*" >&2; }
 
+latest_file() {
+    local latest=""
+    local file
+
+    for file in "$@"; do
+        if [ -z "$latest" ] || [ "$file" -nt "$latest" ]; then
+            latest="$file"
+        fi
+    done
+
+    printf '%s\n' "$latest"
+}
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") <target>
@@ -23,7 +36,17 @@ EOF
 }
 
 install_vscode() {
-    VSIX=$(ls -t "$SCRIPT_DIR/vscode-extension/"*.vsix 2>/dev/null | head -1)
+    shopt -s nullglob
+    local candidates=(
+        "$SCRIPT_DIR"/dist/vscode/*.vsix
+        "$SCRIPT_DIR"/vscode-extension/*.vsix
+    )
+    shopt -u nullglob
+    if [ ${#candidates[@]} -eq 0 ]; then
+        VSIX=""
+    else
+        VSIX=$(latest_file "${candidates[@]}")
+    fi
 
     if [ -z "$VSIX" ]; then
         error "No .vsix file found. Run ./build.sh vscode first."
@@ -36,7 +59,17 @@ install_vscode() {
 }
 
 install_jetbrains() {
-    ZIP=$(ls -t "$SCRIPT_DIR/jetbrains-plugin/build/distributions/"*.zip 2>/dev/null | head -1)
+    shopt -s nullglob
+    local candidates=(
+        "$SCRIPT_DIR"/dist/jetbrains/*.zip
+        "$SCRIPT_DIR"/jetbrains-plugin/build/distributions/*.zip
+    )
+    shopt -u nullglob
+    if [ ${#candidates[@]} -eq 0 ]; then
+        ZIP=""
+    else
+        ZIP=$(latest_file "${candidates[@]}")
+    fi
 
     if [ -z "$ZIP" ]; then
         error "No plugin .zip found. Run ./build.sh jetbrains first."
