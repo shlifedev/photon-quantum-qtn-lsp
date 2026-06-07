@@ -33,6 +33,7 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 ## Build
 
 [Docker](https://www.docker.com/) required. No other local toolchain needed.
+For local Node-based development, use Node.js 20 to match CI.
 
 ```bash
 sh build.sh all        # sync + test + build all plugins
