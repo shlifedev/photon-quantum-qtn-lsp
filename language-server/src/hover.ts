@@ -7,7 +7,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ProjectModel } from './project-model.js';
 import { BUILTIN_TYPE_MAP, KEYWORD_MAP, ATTRIBUTE_MAP, BuiltinTypeInfo, KeywordInfo, AttributeInfo, getDescription } from './builtins.js';
 import { getLocale } from './locale.js';
-import { getIdentifierAtPosition } from './text-navigation.js';
+import { getIdentifierAtPosition, isPositionInCommentOrString } from './text-navigation.js';
 
 /**
  * Handle "Hover" request.
@@ -32,6 +32,10 @@ export function handleHover(
   // Get the document at the requested URI
   const document = documents.get(params.textDocument.uri);
   if (!document) {
+    return null;
+  }
+
+  if (isPositionInCommentOrString(document, params.position)) {
     return null;
   }
 

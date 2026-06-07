@@ -144,8 +144,8 @@ export const CONTROL_KEYWORDS: KeywordInfo[] = [
   { name: 'import', category: 'control', descriptions: { en: 'Imports an external type definition', ko: '외부 타입 정의를 임포트' } },
   { name: 'using', category: 'control', descriptions: { en: 'Imports a namespace', ko: '네임스페이스를 임포트' } },
   { name: 'synced', category: 'control', descriptions: { en: 'Event modifier: synced across network', ko: '이벤트 수식어: 네트워크 동기화' } },
-  { name: 'local', category: 'control', descriptions: { en: 'Event modifier: local-only (not synced)', ko: '이벤트 수식어: 로컬 전용 (동기화 안 됨)' } },
-  { name: 'remote', category: 'control', descriptions: { en: 'Event modifier: remote-only', ko: '이벤트 수식어: 리모트 전용' } },
+  { name: 'local', category: 'control', descriptions: { en: 'Field modifier: dispatch only to the controlling client for a player_ref field', ko: '필드 수식어: player_ref 필드의 조종 클라이언트에만 디스패치' } },
+  { name: 'remote', category: 'control', descriptions: { en: 'Field modifier: dispatch only to non-controlling clients for a player_ref field', ko: '필드 수식어: player_ref 필드의 비조종 클라이언트에만 디스패치' } },
   { name: 'nothashed', category: 'control', descriptions: { en: 'Field modifier: excluded from state hash', ko: '필드 수식어: 상태 해시에서 제외' } },
   { name: 'client', category: 'control', descriptions: { en: 'Event modifier: client-side only', ko: '이벤트 수식어: 클라이언트 전용' } },
   { name: 'server', category: 'control', descriptions: { en: 'Event modifier: server-side only', ko: '이벤트 수식어: 서버 전용' } },
@@ -199,11 +199,11 @@ export const ENUM_BASE_TYPES: string[] = [
 ];
 
 // Top-level keywords for autocomplete at file root
-// Includes event modifiers (synced, local, remote, client, server) that precede declarations
+// Includes event modifiers (synced, client, server) that precede declarations
 export const TOP_LEVEL_KEYWORDS: string[] = [
   'component', 'struct', 'enum', 'flags', 'union', 'event', 'signal',
   'input', 'global', 'asset', 'import', 'using', 'singleton', 'abstract',
-  'synced', 'local', 'remote', 'client', 'server',
+  'synced', 'client', 'server',
   '#pragma', '#define',
 ];
 

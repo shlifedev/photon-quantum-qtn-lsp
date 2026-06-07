@@ -5,7 +5,7 @@ import { DefinitionParams, Location } from 'vscode-languageserver';
 import { TextDocuments } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ProjectModel } from './project-model.js';
-import { getIdentifierAtPosition } from './text-navigation.js';
+import { getIdentifierAtPosition, isPositionInCommentOrString } from './text-navigation.js';
 
 /**
  * Handle "Go to Definition" request.
@@ -24,6 +24,10 @@ export function handleDefinition(
   // Get the document at the requested URI
   const document = documents.get(params.textDocument.uri);
   if (!document) {
+    return null;
+  }
+
+  if (isPositionInCommentOrString(document, params.position)) {
     return null;
   }
 

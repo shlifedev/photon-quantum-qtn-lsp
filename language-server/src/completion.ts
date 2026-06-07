@@ -8,6 +8,8 @@ import {
 } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { ProjectModel } from './project-model.js';
+import { TokenType, tokenize } from './lexer.js';
+import type { QtnToken } from './lexer.js';
 import {
   TOP_LEVEL_KEYWORDS,
   IMPORT_SUB_KEYWORDS,
@@ -23,6 +25,7 @@ import {
 } from './builtins.js';
 import { getLocale } from './locale.js';
 import { nodeKindToSymbolKind } from './symbol-table.js';
+import { isPositionInCommentOrString } from './text-navigation.js';
 
 // Completion context types
 type CompletionContext =
@@ -41,6 +44,11 @@ const attributeCompletionCache = new Map<Locale, CompletionItem[]>();
 const importCompletionCache = new Map<Locale, CompletionItem[]>();
 const enumBaseCompletionCache = new Map<Locale, CompletionItem[]>();
 
+interface StructuralState {
+  braceDepth: number;
+  innermostBlock: string | null;
+}
+
 /**
  * Main completion handler - analyzes cursor position and provides context-appropriate completions
  */
@@ -51,6 +59,10 @@ export function handleCompletion(
 ): CompletionItem[] {
   const document = documents.get(params.textDocument.uri);
   if (!document) {
+    return [];
+  }
+
+  if (isPositionInCommentOrString(document, params.position)) {
     return [];
   }
 
@@ -115,13 +127,15 @@ function detectContext(text: string, offset: number): CompletionContext {
     return 'enumBase';
   }
 
+  const structuralState = getStructuralState(textUpToCursor);
+
   // Check if inside input block
-  if (isInsideInputBlock(textUpToCursor, offset)) {
+  if (isInsideInputBlock(structuralState)) {
     return 'inputBlock';
   }
 
   // Check if in field type position (inside a block, after '{' or ';')
-  if (isFieldTypePosition(textUpToCursor, offset)) {
+  if (isFieldTypePosition(structuralState)) {
     return 'fieldType';
   }
 
@@ -228,71 +242,47 @@ function isEnumBasePosition(text: string, offset: number): boolean {
 /**
  * Check if inside input block
  */
-function isInsideInputBlock(text: string, offset: number): boolean {
-  // Scan backwards to find 'input {' without a closing '}'
-  let braceDepth = 0;
-  let foundInput = false;
-
-  // Look backwards from cursor
-  let i = offset - 1;
-  while (i >= 0) {
-    const ch = text[i];
-
-    if (ch === '}') {
-      braceDepth++;
-    } else if (ch === '{') {
-      braceDepth--;
-
-      // If we're back to level 0, check if this is an input block
-      if (braceDepth < 0) {
-        // Look backwards for 'input' keyword
-        let j = i - 1;
-        while (j >= 0 && /\s/.test(text[j])) {
-          j--;
-        }
-        const beforeBrace = text.substring(Math.max(0, j - 10), j + 1);
-        if (/input\s*$/.test(beforeBrace)) {
-          foundInput = true;
-          break;
-        }
-        // Not an input block, we're in some other block
-        return false;
-      }
-    }
-    i--;
-  }
-
-  return foundInput;
+function isInsideInputBlock(state: StructuralState): boolean {
+  return state.innermostBlock === 'input';
 }
 
 /**
  * Check if in field type position (inside block, after '{' or ';')
  */
-function isFieldTypePosition(text: string, offset: number): boolean {
-  // Look for unmatched '{' without a closing '}'
-  let braceDepth = 0;
-  let inString = false;
+function isFieldTypePosition(state: StructuralState): boolean {
+  return state.braceDepth > 0;
+}
 
-  for (let i = 0; i < offset; i++) {
-    const ch = text[i];
+function getStructuralState(text: string): StructuralState {
+  const tokens = tokenize(text).filter((token) => token.type !== TokenType.eof);
+  const blockStack: Array<string | null> = [];
 
-    // Handle strings
-    if (ch === '"' && (i === 0 || text[i - 1] !== '\\')) {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) continue;
-
-    if (ch === '{') {
-      braceDepth++;
-    } else if (ch === '}') {
-      braceDepth--;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (isPunctuation(token, '{')) {
+      blockStack.push(getBlockKeywordBeforeOpenBrace(tokens, i));
+    } else if (isPunctuation(token, '}') && blockStack.length > 0) {
+      blockStack.pop();
     }
   }
 
-  // We're in field type position if we're inside a block (braceDepth > 0)
-  return braceDepth > 0;
+  return {
+    braceDepth: blockStack.length,
+    innermostBlock: blockStack[blockStack.length - 1] ?? null,
+  };
+}
+
+function getBlockKeywordBeforeOpenBrace(tokens: QtnToken[], openBraceIndex: number): string | null {
+  const previous = tokens[openBraceIndex - 1];
+  if (previous?.type === TokenType.keyword && previous.value === 'input') {
+    return 'input';
+  }
+
+  return null;
+}
+
+function isPunctuation(token: QtnToken, value: string): boolean {
+  return token.type === TokenType.punctuation && token.value === value;
 }
 
 /**

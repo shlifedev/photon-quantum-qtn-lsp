@@ -35,4 +35,15 @@ component P {
     const loc = define('component P {\n  FP Health;\n}', 1, 6);
     expect(loc).toBeNull();
   });
+
+  it('returns null for identifiers inside comments and strings', () => {
+    const source = `enum Weapon { Sword }
+component P {
+  // Weapon comment
+  [Header("Weapon")]
+  FP Value;
+}`;
+    expect(define(source, 2, 5)).toBeNull();
+    expect(define(source, 3, 12)).toBeNull();
+  });
 });

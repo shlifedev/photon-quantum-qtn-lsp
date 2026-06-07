@@ -47,4 +47,16 @@ component P {
     // Leading blank line: offset 0 sits on a newline, no identifier to resolve.
     expect(hoverText('\ncomponent P {}', 0, 0)).toBeNull();
   });
+
+  it('returns null for identifiers inside comments and strings', () => {
+    const source = `enum Weapon { Sword }
+component P {
+  // Weapon comment
+  QString<32> Label;
+  [Header("Weapon")]
+  FP Value;
+}`;
+    expect(hoverText(source, 2, 5)).toBeNull();
+    expect(hoverText(source, 4, 12)).toBeNull();
+  });
 });
