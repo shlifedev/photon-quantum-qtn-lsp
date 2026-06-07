@@ -222,6 +222,18 @@ function createDefinitionSymbol(def: Definition): DocumentSymbol {
   }
 }
 
+function workspaceSymbolName(def: Definition): string {
+  switch (def.kind) {
+    case 'pragma':
+      return `#pragma ${(def as PragmaDefinition).key}`;
+    case 'input':
+    case 'global':
+      return def.kind;
+    default:
+      return def.name ?? def.kind;
+  }
+}
+
 /**
  * Handle textDocument/documentSymbol request
  * Provides hierarchical symbol outline for the current document
@@ -264,7 +276,7 @@ export function handleWorkspaceSymbol(
         // Skip builtin symbols - we only want user-defined symbols
         // (builtins don't have definitions in documents anyway)
         const symbol: SymbolInformation = {
-          name: def.name || def.kind,
+          name: workspaceSymbolName(def),
           kind: nodeKindToSymbolKind(def.kind),
           location: {
             uri: doc.uri,
