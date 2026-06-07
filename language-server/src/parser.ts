@@ -653,6 +653,20 @@ class Parser {
       };
     }
 
+    // import component Name;
+    if (tok.type === TokenType.keyword && tok.value === 'component') {
+      this.advance();
+      const name = this.parseDottedName();
+      this.expect(TokenType.punctuation, ';');
+      return {
+        kind: 'import',
+        importKind: 'component',
+        name,
+        range: this.makeRange(startRange, this.prevRange()),
+        fileUri: this.fileUri,
+      };
+    }
+
     // import Name;  or  import Namespace.Sub.Name;
     const name = this.parseDottedName();
     this.expect(TokenType.punctuation, ';');
