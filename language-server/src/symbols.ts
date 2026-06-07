@@ -24,6 +24,7 @@ import {
   DefineDefinition,
   FieldDefinition,
   EnumMemberDefinition,
+  ParameterDefinition,
   SourceRange,
 } from './ast.js';
 
@@ -60,6 +61,19 @@ function createEnumMemberSymbol(member: EnumMemberDefinition): DocumentSymbol {
     range: sourceRangeToLspRange(member.range),
     selectionRange: sourceRangeToLspRange(member.range),
     detail: member.value !== undefined ? `= ${member.value}` : undefined,
+  };
+}
+
+/**
+ * Create DocumentSymbol for a signal parameter
+ */
+function createParameterSymbol(parameter: ParameterDefinition): DocumentSymbol {
+  return {
+    name: parameter.name,
+    kind: SymbolKind.Variable,
+    range: sourceRangeToLspRange(parameter.range),
+    selectionRange: sourceRangeToLspRange(parameter.range),
+    detail: formatTypeReference(parameter.typeRef),
   };
 }
 
@@ -143,6 +157,7 @@ function createDefinitionSymbol(def: Definition): DocumentSymbol {
         range,
         selectionRange,
         detail: `(${paramTypes})`,
+        children: signalDef.parameters.map((parameter) => createParameterSymbol(parameter)),
       };
     }
 

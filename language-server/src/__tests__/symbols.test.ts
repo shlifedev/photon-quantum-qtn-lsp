@@ -37,6 +37,15 @@ describe('Document symbols', () => {
     );
     expect(symbols).toEqual([]);
   });
+
+  it('returns signal parameters as nested document symbols', () => {
+    const { projectModel, uri } = setupDocument('signal OnDamage(EntityRef target, FP amount);');
+    const symbols = handleDocumentSymbol({ textDocument: { uri } }, projectModel);
+
+    const signal = symbols.find((s) => s.name === 'OnDamage');
+    expect(signal?.children?.map((child) => child.name)).toEqual(['target', 'amount']);
+    expect(signal?.children?.map((child) => child.detail)).toEqual(['EntityRef', 'FP']);
+  });
 });
 
 describe('Workspace symbols', () => {
