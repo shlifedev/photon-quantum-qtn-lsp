@@ -44,6 +44,7 @@ component Player {
   it('import context offers import sub-keywords', () => {
     const labels = complete('import Weapon', 0, 'import Weapon'.length);
     expect(labels).toEqual(expect.arrayContaining(IMPORT_SUB_KEYWORDS));
+    expect(labels).toContain('component');
   });
 
   it('enum-base context offers integer base types', () => {

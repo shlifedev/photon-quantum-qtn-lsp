@@ -65,6 +65,20 @@ component UsesImports {
     expect(bar?.kind).toBe(SymbolKind.Enum);
   });
 
+  it('registers imported component declarations as external symbols', () => {
+    const projectModel = new ProjectModel();
+    projectModel.updateDocument('test://component-import.qtn', `
+import component ExternalPlayer;
+component UsesImport {
+  ExternalPlayer Player;
+}`);
+
+    const symbol = projectModel.getSymbolTable().lookup('ExternalPlayer');
+    expect(symbol?.source).toBe('import');
+    expect(symbol?.kind).toBe(SymbolKind.Class);
+    expect(symbol?.detail).toBe('import component');
+  });
+
   it('parses component inheritance and abstract singleton components', () => {
     const result = parse(`
 abstract component BaseComponent {

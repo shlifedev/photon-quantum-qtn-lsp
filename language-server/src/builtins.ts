@@ -213,4 +213,4 @@ export const FIELD_MODIFIER_KEYWORDS: string[] = [
 ];
 
 // Import sub-keywords
-export const IMPORT_SUB_KEYWORDS: string[] = ['struct', 'enum', 'singleton'];
+export const IMPORT_SUB_KEYWORDS: string[] = ['struct', 'enum', 'component', 'singleton'];
