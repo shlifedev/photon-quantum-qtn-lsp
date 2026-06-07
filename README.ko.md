@@ -33,6 +33,7 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 ## 빌드
 
 [Docker](https://www.docker.com/) 필요. 그 외 로컬 툴체인은 불필요합니다.
+로컬 Node 기반 개발은 CI와 같은 Node.js 20 사용을 권장합니다.
 
 ```bash
 sh build.sh all        # 동기화 + 테스트 + 전체 빌드
