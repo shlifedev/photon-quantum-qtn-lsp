@@ -200,6 +200,23 @@ event MyEvent {
     expect(tokens).toHaveLength(0);
   });
 
+  it('should emit a correctly-sized token for a nullable user-defined type', () => {
+    const source = `
+struct Health { }
+component Player {
+  Health? Maybe;
+}`;
+    const result = getTokens(source);
+    expect(result).not.toBeNull();
+
+    const tokens = decodeTokens(result!.data);
+    // The nullable 'Health?' field type resolves to the user-defined struct and
+    // the token must span exactly 'Health' (6 chars), not 'NullableHealth' (14).
+    const structTokens = tokens.filter(t => t.tokenType === tokenTypes.indexOf('struct'));
+    expect(structTokens.length).toBeGreaterThanOrEqual(1);
+    expect(structTokens.every(t => t.length === 'Health'.length)).toBe(true);
+  });
+
   it('should handle nameRange correctly for multiline token positions', () => {
     const source = `
 struct StateA { }

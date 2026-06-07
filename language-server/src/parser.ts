@@ -1070,13 +1070,11 @@ class Parser {
       this.expect(TokenType.punctuation, ']');
     }
 
-    // Nullable suffix: FP? → becomes NullableFP conceptually, but
-    // we store it as the original name with `?` appended for downstream.
-    // Actually the AST TypeReference doesn't have an isNullable flag.
-    // The DSL maps FP? → NullableFP at codegen. For the parser we record
-    // it as the name with a nullable indicator. Let's just rename it.
+    // Nullable suffix: FP? — keep the original name so symbol lookups and
+    // nameRange stay accurate. The DSL maps it to NullableFP at codegen.
+    let isNullable = false;
     if (this.match(TokenType.punctuation, '?')) {
-      name = 'Nullable' + name;
+      isNullable = true;
     }
 
     // Pointer suffix: Type* (used in signal params)
@@ -1093,6 +1091,7 @@ class Parser {
       genericArgs,
       arraySize,
       isPointer,
+      isNullable,
       range: this.makeRange(startRange, endRange),
     };
   }

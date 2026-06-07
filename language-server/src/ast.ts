@@ -36,6 +36,7 @@ export interface TypeReference {
   genericArgs: TypeArgument[];
   arraySize?: number;  // fixed array size: array<T>[N]
   isPointer: boolean;  // signal parameter pointer: *
+  isNullable: boolean; // nullable suffix: Type?
   range: SourceRange;
 }
 
