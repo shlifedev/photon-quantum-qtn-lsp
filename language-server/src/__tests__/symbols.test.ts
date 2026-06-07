@@ -52,4 +52,23 @@ describe('Workspace symbols', () => {
     // FP is a builtin — must not appear as a workspace symbol.
     expect(results.some((s) => s.name === 'FP')).toBe(false);
   });
+
+  it('uses descriptive names for directives in empty workspace search', () => {
+    const { projectModel } = setupDocument(`#pragma max_players 8
+#define MAX_PLAYERS 8
+using Game.Core;
+input {
+  button Fire;
+}`);
+    const results = handleWorkspaceSymbol({ query: '' }, projectModel);
+    const names = results.map((symbol) => symbol.name);
+
+    expect(names).toEqual(expect.arrayContaining([
+      '#pragma max_players',
+      'MAX_PLAYERS',
+      'Game.Core',
+      'input',
+    ]));
+    expect(names).not.toContain('pragma');
+  });
 });
