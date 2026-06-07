@@ -302,6 +302,24 @@ class Parser {
           this.skipToRecoveryPoint();
           return null;
         }
+        case 'local': {
+          const localTok = this.advance();
+          if (this.check(TokenType.keyword, 'event')) {
+            return this.parseEvent(['local'], attributes, localTok.range);
+          }
+          this.addError("Expected 'event' after 'local'", this.current().range);
+          this.skipToRecoveryPoint();
+          return null;
+        }
+        case 'remote': {
+          const remoteTok = this.advance();
+          if (this.check(TokenType.keyword, 'event')) {
+            return this.parseEvent(['remote'], attributes, remoteTok.range);
+          }
+          this.addError("Expected 'event' after 'remote'", this.current().range);
+          this.skipToRecoveryPoint();
+          return null;
+        }
         case 'signal':
           return this.parseSignal(attributes);
         case 'input':

@@ -108,6 +108,29 @@ abstract singleton component AbstractSingleton {
     expect(singleton.modifiers).toEqual(['abstract', 'singleton']);
   });
 
+  it('parses local and remote event modifiers at top level', () => {
+    const result = parse(`
+local event LocalOnly {
+  PlayerRef Player;
+}
+
+remote event RemoteOnly {
+  PlayerRef Player;
+}`, 'test://local-remote-events.qtn');
+
+    expect(result.parseErrors).toHaveLength(0);
+
+    const localEvent = result.definitions.find((def) => def.kind === 'event' && def.name === 'LocalOnly');
+    const remoteEvent = result.definitions.find((def) => def.kind === 'event' && def.name === 'RemoteOnly');
+
+    if (localEvent?.kind !== 'event' || remoteEvent?.kind !== 'event') {
+      throw new Error('Expected local and remote event definitions');
+    }
+
+    expect(localEvent.modifiers).toEqual(['local']);
+    expect(remoteEvent.modifiers).toEqual(['remote']);
+  });
+
   it('formats pointer signal parameters using QTN suffix syntax once', () => {
     const result = parse(`
 struct Resources {}
