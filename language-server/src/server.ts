@@ -21,6 +21,7 @@ import { handleHover } from './hover.js';
 import { handleDocumentSymbol, handleWorkspaceSymbol } from './symbols.js';
 import { handleSemanticTokensFull, tokenTypes, tokenModifiers } from './semantic-tokens.js';
 import { setLocale } from './locale.js';
+import { shouldSkipDirectory } from './workspace-index.js';
 
 // Create LSP connection using Node IPC
 const connection = createConnection(ProposedFeatures.all);
@@ -207,14 +208,6 @@ async function findQtnFiles(root: string): Promise<string[]> {
 
   await visit(root);
   return files;
-}
-
-function shouldSkipDirectory(name: string): boolean {
-  return name === '.git' ||
-    name === 'node_modules' ||
-    name === 'dist' ||
-    name === 'out' ||
-    name === 'build';
 }
 
 function uriToFilePath(uri: string): string | null {
