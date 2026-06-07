@@ -32,6 +32,7 @@ services:
       service: builder
     command: >
       bash -c "
+        cp /workspace/shared/syntaxes/qtn.tmLanguage.json /workspace/vscode-extension/syntaxes/qtn.tmLanguage.json &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/language-server && npm ci --prefer-offline &&
         cd /workspace/vscode-extension && npm ci --prefer-offline &&
@@ -45,6 +46,7 @@ services:
       service: builder
     command: >
       bash -c "
+        cp /workspace/shared/syntaxes/qtn.tmLanguage.json /workspace/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
         cd /workspace/language-server && npm ci --prefer-offline && npm run build &&
         cd /workspace/jetbrains-plugin && ./gradlew buildPlugin --build-cache &&
         mkdir -p /workspace/dist/jetbrains &&
