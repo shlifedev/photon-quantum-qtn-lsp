@@ -1,8 +1,6 @@
 package com.qtn.plugin
 
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerSupportProvider
@@ -27,10 +25,8 @@ class QtnLspServerDescriptor(project: Project) : ProjectWideLspServerDescriptor(
     }
 
     override fun createCommandLine(): GeneralCommandLine {
-        // Find the bundled language server
-        val plugin = PluginManagerCore.getPlugin(PluginId.getId("com.qtn.syntax-highlighting"))
-        val pluginPath = plugin?.pluginPath
-            ?: throw IllegalStateException("QTN plugin not found")
+        val pluginPath = QtnPluginPaths.getPluginPath()
+            ?: throw IllegalStateException("QTN plugin path not found")
 
         val serverPath = pluginPath.resolve("language-server/out/server.js")
 

@@ -26,6 +26,9 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# Plugin verifier reports
+verification-*/
+
 # Worktrees
 .worktrees/
 
