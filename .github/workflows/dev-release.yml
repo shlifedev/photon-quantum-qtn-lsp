@@ -1,0 +1,103 @@
+name: Dev Release
+
+# dev 푸시마다 마켓플레이스 배포 없이 GitHub 프리릴리스만 생성한다.
+# 태그는 dev-* 접두사라 release.yml의 버전 계산(grep '^v')에 간섭하지 않는다.
+on:
+  push:
+    branches: [dev]
+
+# 새 푸시가 오면 진행 중인 실행을 취소 — 푸시마다 고유 태그라 경쟁은 없고,
+# 낡은 커밋의 프리릴리스 생성만 막는다.
+concurrency:
+  group: dev-release
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # version/secrets 미전달 → 버전 주입·서명·마켓 배포가 모두 빠진 dev 빌드.
+  # (build.yml의 publish 스텝은 inputs.version != '' 조건이라 자동 스킵)
+  # test job이 포함돼 있어 dev 푸시에 대한 테스트 검증도 겸한다.
+  build:
+    uses: ./.github/workflows/build.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Determine tag
+        id: tag
+        run: |
+          TAG="dev-${{ github.run_number }}-$(git rev-parse --short HEAD)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # 마지막 stable 릴리스(vX.Y.Z) 이후 쌓인 커밋 목록.
+          # dev-* 프리릴리스 태그가 섞여도 정확한 vX.Y.Z 형식만 매칭한다.
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          {
+            echo 'BODY<<CHANGELOG_EOF'
+            echo "## What's Changed (since ${PREV_TAG:-beginning})"
+            echo ''
+            git log "$RANGE" --pretty=format:'- %s (%h)' --no-merges 2>/dev/null || echo '- No changes'
+            echo ''
+            echo ''
+            echo '## Downloads'
+            echo ''
+            echo '> Dev build — 마켓플레이스에 배포되지 않으며 JetBrains 플러그인은 미서명 상태입니다.'
+            echo ''
+            echo '| IDE | File |'
+            echo '|-----|------|'
+            echo "| VSCode | \`QtnLSP-vscode.vsix\` |"
+            echo "| JetBrains Rider | \`QtnLSP-jetbrains.zip\` |"
+            echo "| Visual Studio 2022 | \`QtnLSP-vs.vsix\` |"
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Create tag and prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          BODY: ${{ steps.changelog.outputs.BODY }}
+        run: |
+          # 재실행 대비 멱등 가드: 같은 태그의 릴리스가 이미 있으면 스킵
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Skipping."
+            exit 0
+          fi
+
+          git rev-parse "$TAG" >/dev/null 2>&1 || git tag "$TAG"
+          git push origin "$TAG"
+
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease \
+            --title "$TAG" \
+            --notes "$BODY" \
+            artifacts/QtnLSP-vscode.vsix \
+            artifacts/QtnLSP-jetbrains.zip \
+            artifacts/QtnLSP-vs.vsix
