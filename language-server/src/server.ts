@@ -15,7 +15,6 @@ import { promises as fs, type Dirent } from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { ProjectModel } from './project-model.js';
-import { computeDiagnostics } from './diagnostics.js';
 import { handleDefinition } from './definition.js';
 import { handleCompletion } from './completion.js';
 import { handleHover } from './hover.js';
@@ -84,58 +83,24 @@ connection.onInitialized(() => {
   void indexWorkspaceFiles();
 });
 
-// ── Diagnostics ────────────────────────────────────────────────────
-// 키 입력마다 전체 재검증하지 않도록 디바운스. 중복 타입 이름은 크로스 파일
-// 진단이라 한 문서가 바뀌면 열린 문서 전체를 같은 틱에 재검증한다.
-
-const DIAGNOSTICS_DEBOUNCE_MS = 250;
-let pendingValidation: NodeJS.Timeout | undefined;
-
-function publishDiagnostics(uri: string): void {
-  connection.sendDiagnostics({ uri, diagnostics: computeDiagnostics(uri, projectModel) });
-}
-
-function clearDiagnostics(uri: string): void {
-  connection.sendDiagnostics({ uri, diagnostics: [] });
-}
-
-function scheduleValidation(): void {
-  if (pendingValidation) {
-    clearTimeout(pendingValidation);
-  }
-  pendingValidation = setTimeout(() => {
-    pendingValidation = undefined;
-    for (const doc of documents.all()) {
-      publishDiagnostics(doc.uri);
-    }
-  }, DIAGNOSTICS_DEBOUNCE_MS);
-}
-
 // Document change handler - update project model when documents change
 documents.onDidChangeContent((change) => {
   projectModel.updateDocument(change.document.uri, change.document.getText());
-  scheduleValidation();
 });
 
 // Document close handler - keep workspace files indexed from disk.
 documents.onDidClose((event) => {
-  // 닫힌 문서의 잔여 squiggle 제거 (디스크 내용 기준 인덱스는 유지)
-  clearDiagnostics(event.document.uri);
   void reloadClosedDocument(event.document.uri);
 });
 
 // Handle workspace file changes (external edits, file creation/deletion)
 connection.onDidChangeWatchedFiles((params) => {
-  let projectChanged = false;
-
   for (const change of params.changes) {
     if (!change.uri.endsWith('.qtn')) continue;
-    projectChanged = true;
 
     switch (change.type) {
       case FileChangeType.Deleted:
         projectModel.removeDocument(change.uri);
-        clearDiagnostics(change.uri);
         break;
       case FileChangeType.Created:
       case FileChangeType.Changed:
@@ -144,11 +109,6 @@ connection.onDidChangeWatchedFiles((params) => {
         }
         break;
     }
-  }
-
-  // 외부 파일 변경도 열린 문서의 크로스 파일 진단(중복/미지 타입)에 영향을 준다
-  if (projectChanged) {
-    scheduleValidation();
   }
 });
 
@@ -185,9 +145,6 @@ async function indexWorkspaceFiles(): Promise<void> {
       connection.console.warn(`Failed to index QTN workspace '${root}': ${formatError(error)}`);
     }
   }
-
-  // 인덱싱이 끝나면 크로스 파일 진단(중복/미지 타입)이 달라질 수 있다
-  scheduleValidation();
 }
 
 async function reloadClosedDocument(uri: string): Promise<void> {

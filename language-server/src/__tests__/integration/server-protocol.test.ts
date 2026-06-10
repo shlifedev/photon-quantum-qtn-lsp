@@ -32,10 +32,9 @@ import {
   ShutdownRequest,
   ExitNotification,
   PublishDiagnosticsNotification,
-  DiagnosticSeverity,
   type CompletionItem,
   type CompletionList,
-  type Diagnostic,
+  type PublishDiagnosticsParams,
   type Hover,
   type Location,
   type DocumentSymbol,
@@ -187,18 +186,14 @@ describe('LSP protocol (real server.js over stdio)', () => {
     expect(results.map((s) => s.name)).toContain('WeaponType');
   });
 
-  it('publishes diagnostics for a document with errors', async () => {
+  it('does not publish diagnostics (feature removed by design)', async () => {
     const BROKEN_URI = 'file:///virtual/broken.qtn';
-
-    const received = new Promise<Diagnostic[]>((resolve) => {
-      connection.onNotification(PublishDiagnosticsNotification.type, (params) => {
-        if (params.uri === BROKEN_URI && params.diagnostics.length > 0) {
-          resolve(params.diagnostics);
-        }
-      });
+    const published: PublishDiagnosticsParams[] = [];
+    connection.onNotification(PublishDiagnosticsNotification.type, (params) => {
+      published.push(params);
     });
 
-    // 문법 오류(닫는 brace 없음) + 미지 타입 참조를 모두 포함
+    // 오진단 소음 때문에 진단 발행을 제거했다 — 깨진 문서를 열어도 아무것도 오지 않아야 한다
     connection.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: {
         uri: BROKEN_URI,
@@ -208,9 +203,7 @@ describe('LSP protocol (real server.js over stdio)', () => {
       },
     });
 
-    const diagnostics = await received;
-    expect(diagnostics.every((d) => d.source === 'qtn')).toBe(true);
-    expect(diagnostics.some((d) => d.severity === DiagnosticSeverity.Error)).toBe(true);
-    expect(diagnostics.some((d) => d.message === "Unknown type 'MissingType'")).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(published).toEqual([]);
   });
 });

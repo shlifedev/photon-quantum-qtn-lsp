@@ -5,7 +5,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { ProjectModel } from '../project-model.js';
-import { computeDiagnostics } from '../diagnostics.js';
 import { normalizeUri } from '../uri-utils.js';
 
 // VSCode(didOpen) 형식과 Node pathToFileURL(워크스페이스 인덱싱) 형식
@@ -62,23 +61,23 @@ describe('ProjectModel URI key normalization', () => {
   });
 });
 
-describe('duplicate diagnostics across URI forms', () => {
-  it('does not report a file as a duplicate of itself', () => {
+describe('symbol identity across URI forms', () => {
+  it('does not double-count definitions when the same file arrives in both forms', () => {
     const projectModel = new ProjectModel();
-    projectModel.updateDocument(PLAIN_URI, SOURCE);
-    projectModel.updateDocument(ENCODED_URI, SOURCE);
+    projectModel.updateDocument(PLAIN_URI, SOURCE); // 워크스페이스 인덱싱
+    projectModel.updateDocument(ENCODED_URI, SOURCE); // didOpen
 
-    const diagnostics = computeDiagnostics(ENCODED_URI, projectModel);
-    expect(diagnostics).toEqual([]);
+    const weaponTypeDefs = [...projectModel.getAllDocuments().values()]
+      .flatMap((doc) => doc.definitions)
+      .filter((def) => def.name === 'WeaponType');
+    expect(weaponTypeDefs).toHaveLength(1);
   });
 
-  it('still reports genuine duplicates in distinct files', () => {
+  it('keeps definitions from genuinely distinct files separate', () => {
     const projectModel = new ProjectModel();
     projectModel.updateDocument('file:///Users/dev/%40src/project/a.qtn', SOURCE);
     projectModel.updateDocument('file:///Users/dev/@src/project/b.qtn', SOURCE);
 
-    const diagnostics = computeDiagnostics('file:///Users/dev/%40src/project/a.qtn', projectModel);
-    const dups = diagnostics.filter((d) => d.message.includes('Duplicate definition'));
-    expect(dups.length).toBeGreaterThan(0);
+    expect(projectModel.getAllDocuments().size).toBe(2);
   });
 });
