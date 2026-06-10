@@ -73,6 +73,9 @@ function completionLabels(result: CompletionItem[] | CompletionList | null): str
 
 beforeAll(async () => {
   child = spawn(process.execPath, [serverPath, '--stdio'], { stdio: 'pipe' });
+  // Exit 알림 직후 서버가 죽으면 stdin으로의 비동기 write가 EPIPE를 던질 수 있다.
+  // unhandled rejection으로 vitest가 실패하지 않도록 삼킨다 (teardown 경쟁 — flaky 방지).
+  child.stdin.on('error', () => {});
   connection = createProtocolConnection(
     new StreamMessageReader(child.stdout),
     new StreamMessageWriter(child.stdin),
