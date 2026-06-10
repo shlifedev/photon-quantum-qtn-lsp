@@ -36,9 +36,9 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 For local Node-based development, use Node.js 20 to match CI.
 
 ```bash
-sh build.sh all        # sync + test + build all plugins
-sh build.sh vscode     # VSCode extension only
-sh build.sh jetbrains  # JetBrains plugin only
+sh scripts/build.sh all        # sync + test + build all plugins
+sh scripts/build.sh vscode     # VSCode extension only
+sh scripts/build.sh jetbrains  # JetBrains plugin only
 ```
 
 ## Screenshot

@@ -36,9 +36,9 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 로컬 Node 기반 개발은 CI와 같은 Node.js 20 사용을 권장합니다.
 
 ```bash
-sh build.sh all        # 동기화 + 테스트 + 전체 빌드
-sh build.sh vscode     # VSCode 확장만
-sh build.sh jetbrains  # JetBrains 플러그인만
+sh scripts/build.sh all        # 동기화 + 테스트 + 전체 빌드
+sh scripts/build.sh vscode     # VSCode 확장만
+sh scripts/build.sh jetbrains  # JetBrains 플러그인만
 ```
 
 ## 스크린샷

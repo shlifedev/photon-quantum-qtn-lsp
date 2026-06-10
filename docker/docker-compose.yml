@@ -1,10 +1,10 @@
 services:
   builder:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     volumes:
-      - .:/workspace
+      - ..:/workspace
       - npm-cache:/root/.npm
       - gradle-cache:/root/.gradle
 

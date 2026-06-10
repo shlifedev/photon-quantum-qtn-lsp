@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -38,8 +38,8 @@ EOF
 install_vscode() {
     shopt -s nullglob
     local candidates=(
-        "$SCRIPT_DIR"/dist/vscode/*.vsix
-        "$SCRIPT_DIR"/vscode-extension/*.vsix
+        "$ROOT_DIR"/dist/vscode/*.vsix
+        "$ROOT_DIR"/vscode-extension/*.vsix
     )
     shopt -u nullglob
     if [ ${#candidates[@]} -eq 0 ]; then
@@ -49,7 +49,7 @@ install_vscode() {
     fi
 
     if [ -z "$VSIX" ]; then
-        error "No .vsix file found. Run ./build.sh vscode first."
+        error "No .vsix file found. Run scripts/build.sh vscode first."
         exit 1
     fi
 
@@ -61,8 +61,8 @@ install_vscode() {
 install_jetbrains() {
     shopt -s nullglob
     local candidates=(
-        "$SCRIPT_DIR"/dist/jetbrains/*.zip
-        "$SCRIPT_DIR"/jetbrains-plugin/build/distributions/*.zip
+        "$ROOT_DIR"/dist/jetbrains/*.zip
+        "$ROOT_DIR"/jetbrains-plugin/build/distributions/*.zip
     )
     shopt -u nullglob
     if [ ${#candidates[@]} -eq 0 ]; then
@@ -72,7 +72,7 @@ install_jetbrains() {
     fi
 
     if [ -z "$ZIP" ]; then
-        error "No plugin .zip found. Run ./build.sh jetbrains first."
+        error "No plugin .zip found. Run scripts/build.sh jetbrains first."
         echo ""
         echo "  JetBrains plugins cannot be installed from CLI."
         echo "  After building, install manually:"

@@ -26,7 +26,7 @@ jobs:
             jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json \
             vs-extension/Grammars/qtn.tmLanguage.json; do
             diff -u shared/syntaxes/qtn.tmLanguage.json "$f" \
-              || { echo "::error::$f is out of sync with shared/syntaxes/ — run 'sh build.sh sync'"; exit 1; }
+              || { echo "::error::$f is out of sync with shared/syntaxes/ — run 'sh scripts/build.sh sync'"; exit 1; }
           done
 
   build:

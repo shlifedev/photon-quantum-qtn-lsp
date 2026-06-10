@@ -64,6 +64,9 @@ docs/
 ├── HOW_TO_INSTALL.md                 # 설치 가이드
 ├── README.ko.md / ja / zh-TW        # README 번역본
 └── images/sample.png                 # README 스크린샷
+
+docker/                               # Docker 빌드 환경 (Dockerfile, compose)
+scripts/                              # build.sh, install.sh, 빌드 보조 스크립트
 ```
 
 ## 핵심 규칙
@@ -90,12 +93,12 @@ docs/
 
 ```bash
 # Docker로 빌드 (로컬 툴체인 불필요, Docker만 있으면 됨)
-sh build.sh sync          # 문법 파일 동기화
-sh build.sh test          # 테스트 실행
-sh build.sh vscode        # VSCode 확장 빌드
-sh build.sh jetbrains     # JetBrains 플러그인 빌드
-sh build.sh all           # sync + test + vscode + jetbrains
-sh build.sh clean         # 빌드 산출물 삭제
+sh scripts/build.sh sync          # 문법 파일 동기화
+sh scripts/build.sh test          # 테스트 실행
+sh scripts/build.sh vscode        # VSCode 확장 빌드
+sh scripts/build.sh jetbrains     # JetBrains 플러그인 빌드
+sh scripts/build.sh all           # sync + test + vscode + jetbrains
+sh scripts/build.sh clean         # 빌드 산출물 삭제
 ```
 
 ## TextMate 스코프 매핑

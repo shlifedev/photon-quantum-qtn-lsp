@@ -35,9 +35,9 @@ Photon Quantum3 DSL(`.qtn`)檔案的語法高亮與基於LSP的IntelliSense。
 需要 [Docker](https://www.docker.com/)。無需其他本地工具鏈。
 
 ```bash
-sh build.sh all        # 同步 + 測試 + 建置所有外掛
-sh build.sh vscode     # 僅 VSCode 擴充功能
-sh build.sh jetbrains  # 僅 JetBrains 外掛
+sh scripts/build.sh all        # 同步 + 測試 + 建置所有外掛
+sh scripts/build.sh vscode     # 僅 VSCode 擴充功能
+sh scripts/build.sh jetbrains  # 僅 JetBrains 外掛
 ```
 
 ## 截圖
