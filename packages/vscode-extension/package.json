@@ -55,8 +55,8 @@
     "vscode:prepublish": "npm run compile && npm run webpack",
     "compile": "cd .. && npm run compile",
     "webpack": "cd .. && npm run webpack",
-    "test": "vscode-tmgrammar-test -g syntaxes/qtn.tmLanguage.json 'tests/unit/*.test'",
-    "test:snap": "vscode-tmgrammar-snap -g syntaxes/qtn.tmLanguage.json 'tests/snap/*.qtn'",
+    "test": "vscode-tmgrammar-test -g syntaxes/qtn.tmLanguage.json \"tests/unit/*.test\"",
+    "test:snap": "vscode-tmgrammar-snap -g syntaxes/qtn.tmLanguage.json \"tests/snap/*.qtn\"",
     "sync-grammar": "cp ../shared/syntaxes/qtn.tmLanguage.json syntaxes/qtn.tmLanguage.json",
     "build": "tsc -p .",
     "watch": "tsc -watch -p ."

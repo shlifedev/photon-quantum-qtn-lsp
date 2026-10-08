@@ -18,6 +18,8 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 
 ## 설치
 
+Visual Studio와 Rider 확장에는 QTN IntelliSense용 Node.js 런타임이 포함됩니다. 별도 Node.js 설치나 PATH 설정이 필요 없으며, 확장 실행 시 런타임을 다운로드하지 않습니다. VSCode는 내장 런타임을 사용합니다.
+
 ### VSCode
 - **마켓플레이스**: [Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — 또는 VSCode **확장(Extensions)** 뷰에서 `Quantum DSL (QTN)` 검색.
 - **CLI**: `code --install-extension shlifedev.qtn-syntax-highlighting`
@@ -33,7 +35,7 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 ## 빌드
 
 [Docker](https://www.docker.com/) 필요. 그 외 로컬 툴체인은 불필요합니다.
-로컬 Node 기반 개발은 CI와 같은 Node.js 20 사용을 권장합니다.
+로컬 Node 기반 개발은 CI와 같은 Node.js 22를 사용합니다. VS·Rider 빌드는 체크섬으로 고정한 Node.js 22.23.3을 다운로드하며, 런타임 포함으로 배포 파일 용량이 증가합니다. [런타임 패키징·검증](RUNTIME_PACKAGING.md)을 참고하세요.
 
 ```bash
 sh scripts/build.sh all        # 동기화 + 테스트 + 전체 빌드

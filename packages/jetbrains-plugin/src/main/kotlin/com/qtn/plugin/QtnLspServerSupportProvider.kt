@@ -1,16 +1,23 @@
 package com.qtn.plugin
 
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.configurations.PathEnvironmentVariableUtil
+import com.intellij.execution.ExecutionException
+import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.util.Key
 import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.platform.lsp.api.LspServerSupportProvider.LspServerStarter
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
-import java.io.File
+import com.intellij.platform.lsp.api.LspServerListener
+import org.eclipse.lsp4j.InitializeResult
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.exists
@@ -31,45 +38,33 @@ class QtnLspServerSupportProvider : LspServerSupportProvider {
             return
         }
 
-        val nodePath = QtnLspLauncher.findNode()
-        if (nodePath == null) {
-            QtnLspLauncher.notifyOnce(
-                project,
-                "Node.js 18+ was not found. QTN IntelliSense is disabled; syntax highlighting still works. " +
-                    "Install Node.js from https://nodejs.org/ and reopen the project."
-            )
-            return
+        try {
+            val pluginPath = QtnPluginPaths.getPluginPath()
+                ?: error("QTN plugin installation directory could not be located")
+            val nodePath = QtnBundledRuntime.resolve(pluginPath)
+            serverStarter.ensureServerStarted(QtnLspServerDescriptor(project, nodePath.toString(), serverPath))
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: Exception) {
+            QtnLspLauncher.notifyOnce(project, "QTN IntelliSense could not start. Syntax highlighting still works. " +
+                "Reinstall/update the QTN plugin and check the IDE log for details. ${e.message}")
         }
-
-        serverStarter.ensureServerStarted(QtnLspServerDescriptor(project, nodePath, serverPath))
     }
 }
 
 internal object QtnLspLauncher {
     private val notified = AtomicBoolean(false)
+    private val log = Logger.getInstance(QtnLspLauncher::class.java)
+
+    fun logStderr(message: String) = log.warn("QTN server stderr: $message")
 
     fun findServerJs(): Path? =
         QtnPluginPaths.getPluginPath()
             ?.resolve("language-server/out/server.js")
             ?.takeIf { it.exists() }
 
-    fun findNode(): String? {
-        val exeName = if (SystemInfo.isWindows) "node.exe" else "node"
-        PathEnvironmentVariableUtil.findInPath(exeName)?.let { return it.absolutePath }
-
-        // GUI로 실행된 IDE는 셸 PATH를 물려받지 못하는 경우가 있어 흔한 설치 경로를 추가 확인
-        val fallbacks = if (SystemInfo.isWindows) {
-            listOfNotNull(
-                System.getenv("ProgramFiles")?.let { "$it\\nodejs\\node.exe" },
-                System.getenv("LOCALAPPDATA")?.let { "$it\\Programs\\nodejs\\node.exe" }
-            )
-        } else {
-            listOf("/usr/local/bin/node", "/opt/homebrew/bin/node", "/usr/bin/node")
-        }
-        return fallbacks.firstOrNull { File(it).canExecute() }
-    }
-
     fun notifyOnce(project: Project, message: String) {
+        log.warn(message)
         if (!notified.compareAndSet(false, true)) return
         NotificationGroupManager.getInstance()
             .getNotificationGroup("QTN Language Server")
@@ -83,7 +78,38 @@ class QtnLspServerDescriptor(
     private val nodePath: String,
     private val serverPath: Path,
 ) : ProjectWideLspServerDescriptor(project, "QTN") {
+    private val initialized = AtomicBoolean(false)
+
     override fun isSupportedFile(file: VirtualFile): Boolean = file.extension == "qtn"
+
+    override val lspServerListener = object : LspServerListener {
+        override fun serverInitialized(params: InitializeResult) { initialized.set(true) }
+    }
+
+    override fun startServerProcess(): OSProcessHandler {
+        initialized.set(false)
+        try {
+            return super.startServerProcess().also { handler ->
+                handler.addProcessListener(object : ProcessAdapter() {
+                    override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
+                        if (outputType == ProcessOutputTypes.STDERR) QtnLspLauncher.logStderr(event.text.take(8192))
+                    }
+
+                    override fun processTerminated(event: ProcessEvent) {
+                        if (event.exitCode != 0 && !initialized.get() && !project.isDisposed) {
+                            QtnLspLauncher.notifyOnce(project,
+                                "QTN IntelliSense failed to initialize (exit ${event.exitCode}). " +
+                                "Syntax highlighting still works. Check the IDE log and update/reinstall the plugin.")
+                        }
+                    }
+                })
+            }
+        } catch (e: ExecutionException) {
+            QtnLspLauncher.notifyOnce(project, "The bundled QTN runtime could not start: ${e.message}. " +
+                "Syntax highlighting still works. Check the IDE log and update/reinstall the plugin.")
+            throw e
+        }
+    }
 
     override fun createInitializationOptions(): Any {
         val locale = java.util.Locale.getDefault().language  // "ko", "en", etc.
@@ -92,4 +118,6 @@ class QtnLspServerDescriptor(
 
     override fun createCommandLine(): GeneralCommandLine =
         GeneralCommandLine(nodePath, serverPath.toString(), "--stdio")
+            .withEnvironment("NODE_OPTIONS", "")
+            .withEnvironment("NODE_PATH", "")
 }

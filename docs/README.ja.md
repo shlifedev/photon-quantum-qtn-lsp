@@ -18,6 +18,8 @@ Photon Quantum3 DSL(`.qtn`)ファイル向けのシンタックスハイライ�
 
 ## インストール
 
+Visual Studio と Rider の拡張には QTN IntelliSense 用の Node.js ランタイムが含まれています。Node.js の別途インストールや PATH 設定は不要で、拡張の起動時にもダウンロードしません。VSCode は内蔵ランタイムを使用します。
+
 ### VSCode
 - **マーケットプレイス**: [Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — または VSCode の**拡張機能（Extensions）**ビューで `Quantum DSL (QTN)` を検索。
 - **CLI**: `code --install-extension shlifedev.qtn-syntax-highlighting`
@@ -33,6 +35,8 @@ Photon Quantum3 DSL(`.qtn`)ファイル向けのシンタックスハイライ�
 ## ビルド
 
 [Docker](https://www.docker.com/)が必要です。その他のローカルツールチェーンは不要です。
+
+ローカルでソースからビルドする場合は Node.js 22 を使用します。VS・Rider のビルド時にチェックサムを固定した Node.js 22.23.3 を取得します。ランタイム同梱により配布ファイルのサイズが増えます。[パッケージの検証手順](RUNTIME_PACKAGING.md)。
 
 ```bash
 sh scripts/build.sh all        # 同期 + テスト + 全プラグインビルド

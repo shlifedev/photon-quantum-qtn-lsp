@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22.23.3-slim
 
 # JDK 21 설치 (JetBrains 2024.3+ 플러그인 빌드용)
 RUN apt-get update && \

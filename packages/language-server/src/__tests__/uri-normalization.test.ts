@@ -6,10 +6,13 @@
 import { describe, it, expect } from 'vitest';
 import { ProjectModel } from '../project-model.js';
 import { normalizeUri } from '../uri-utils.js';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // VSCode(didOpen) 형식과 Node pathToFileURL(워크스페이스 인덱싱) 형식
-const ENCODED_URI = 'file:///Users/dev/%40src/project/sample.qtn';
-const PLAIN_URI = 'file:///Users/dev/@src/project/sample.qtn';
+const PLAIN_URI = pathToFileURL(join(tmpdir(), '@src', 'project', 'sample.qtn')).href;
+const ENCODED_URI = PLAIN_URI.replace('@', '%40');
 
 const SOURCE = `
 enum WeaponType { Sword, Bow, Staff, Dagger }

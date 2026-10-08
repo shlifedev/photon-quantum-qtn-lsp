@@ -128,7 +128,7 @@ cd /path/to/QtnLSP
 ### 전제 조건
 
 - **Visual Studio 2022** (17.0 이상) 필수 — VS 2019는 지원하지 않음
-- **Node.js 18+** 시스템에 설치 필요 (LSP 서버 실행용)
+- Node.js 런타임이 확장에 포함됩니다. 별도 설치나 PATH 설정이 필요 없습니다.
 
 ### 방법 1: VSIX 파일로 설치 (권장)
 
@@ -183,7 +183,7 @@ cd /path/to/QtnLSP
 
 ### 빌드 요구사항
 
-- **공통**: Node.js 18+ (npm 9+), git
+- **공통**: Node.js 22 (npm 포함), git — 소스 빌드용이며 확장 사용자는 설치할 필요 없음
 - **VSCode**: 추가 요구사항 없음
 - **JetBrains**: JDK 17 필수
 - **Visual Studio**: .NET SDK 6.0+
@@ -271,6 +271,8 @@ code --install-extension qtn-syntax-highlighting-1.0.0.vsix
 
 **자동 완성이 작동하지 않음**
 
+- Node.js는 플러그인에 동봉되므로 별도 설치나 PATH 설정이 필요 없습니다.
+- IDE 로그에서 런타임 누락·실행 권한 오류를 확인하고, 플러그인을 업데이트하거나 재설치하세요.
 - Rider를 완전히 재시작하세요
 - File → Invalidate Caches → Invalidate and Restart 사용
 
@@ -299,11 +301,9 @@ build.sh가 시스템 Java를 감지하면 자동으로 JDK 17로 전환합니�
 
 **자동 완성이 작동하지 않음**
 
-- Node.js가 시스템 PATH에 설치되어 있는지 확인:
-  ```bash
-  node --version
-  ```
-- Visual Studio 출력 창에서 "QTN Language Server" 관련 오류 확인
+- Node.js는 확장에 동봉되므로 별도로 설치하거나 PATH를 수정할 필요가 없습니다.
+- Visual Studio 출력 창의 "QTN Language Server"에서 누락된 런타임, 실행 권한, 서버 오류 등 구체적인 원인을 확인하세요.
+- 확장을 최신 버전으로 업데이트하거나 재설치하세요.
 - Visual Studio를 완전히 재시작
 
 **.NET SDK 오류 (빌드 시)**

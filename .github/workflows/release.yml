@@ -104,6 +104,8 @@ jobs:
             echo ''
             echo '## Downloads'
             echo ''
+            echo 'Visual Studio and Rider include a private Node.js runtime: no separate Node.js installation or PATH setup is required. Downloads are larger because the runtime is included.'
+            echo ''
             echo '| IDE | File |'
             echo '|-----|------|'
             echo "| VSCode | \`QtnLSP-vscode.vsix\` |"

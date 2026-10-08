@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.3
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -50,6 +50,9 @@ jobs:
 
       - name: Sync grammar
         run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vscode-extension/syntaxes/qtn.tmLanguage.json
+
+      - name: Runtime packaging tests
+        run: npm run test:runtimes
 
       - name: Language Server unit tests
         run: npm --prefix packages/language-server test
@@ -77,7 +80,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.3
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -130,7 +133,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.3
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -139,19 +142,24 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # 플러그인에는 webpack 단일 번들만 동봉한다 (node_modules 불필요)
+      # 공유 서버 번들과 플랫폼별 Node 실행 파일을 동봉한다.
       - name: Build language-server bundle
         run: |
           npm ci
           npm --prefix packages/language-server ci
           npm run bundle:server
+          npm run prepare:runtimes -- --target=jetbrains
 
       - name: Sync grammar
         run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
+
+      - name: Rider launcher tests
+        working-directory: packages/jetbrains-plugin
+        run: ./gradlew test
 
       # 릴리스(version 있음)면 서명본을 만들고, PR/dev면 서명 없이 빌드만 검증한다.
       # 시크릿은 base64로 저장돼 있어 파일로 디코드 후 경로를 주입한다(멀티라인 전달 손상 회피).
@@ -185,28 +193,14 @@ jobs:
             cp packages/jetbrains-plugin/build/distributions/*.zip release/QtnLSP-jetbrains.zip
           fi
 
+      - name: Verify packaged Rider server
+        run: npm run test:package -- jetbrains release/QtnLSP-jetbrains.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: jetbrains-zip
           path: release/QtnLSP-jetbrains.zip
           retention-days: 7
-
-      # 첫 버전은 마켓에 수동 업로드해야 리스팅이 생긴다. 그 전엔 publishPlugin이 실패하므로,
-      # 리스팅 승인 후 `gh variable set JETBRAINS_MARKETPLACE_LISTED --body true`로 켜면 그때부터 자동 배포.
-      - name: Publish to JetBrains Marketplace
-        if: inputs.version != '' && vars.JETBRAINS_MARKETPLACE_LISTED == 'true'
-        working-directory: packages/jetbrains-plugin
-        env:
-          VERSION: ${{ inputs.version }}
-          CERTIFICATE_CHAIN_B64: ${{ secrets.JETBRAINS_CERTIFICATE_CHAIN }}
-          PRIVATE_KEY_B64: ${{ secrets.JETBRAINS_PRIVATE_KEY }}
-          PRIVATE_KEY_PASSWORD: ${{ secrets.JETBRAINS_PRIVATE_KEY_PASSWORD }}
-          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
-        run: |
-          printf '%s' "$CERTIFICATE_CHAIN_B64" | base64 -d > sign-chain.crt
-          printf '%s' "$PRIVATE_KEY_B64" | base64 -d > sign-private.pem
-          export CERTIFICATE_CHAIN_FILE=sign-chain.crt PRIVATE_KEY_FILE=sign-private.pem
-          ./gradlew publishPlugin "-PpluginVersion=${VERSION#v}"
 
   build-vs:
     needs: test
@@ -220,7 +214,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.23.3
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -236,6 +230,7 @@ jobs:
           npm ci
           npm --prefix packages/language-server ci
           npm run bundle:server
+          npm run prepare:runtimes -- --target=vs
 
       - name: Sync grammar + LICENSE
         shell: bash
@@ -265,11 +260,87 @@ jobs:
           mkdir -p release
           find packages/vs-extension/bin/Release -name "*.vsix" -exec cp {} release/QtnLSP-vs.vsix \;
 
+      - name: Verify packaged Visual Studio server
+        run: npm run test:package -- vs release/QtnLSP-vs.vsix
+
       - uses: actions/upload-artifact@v4
         with:
           name: vs-vsix
           path: release/QtnLSP-vs.vsix
           retention-days: 7
+
+  verify-packages:
+    needs: build-jetbrains
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: win-x64
+          - runner: windows-11-arm
+            platform: win-arm64
+          - runner: macos-15-intel
+            platform: darwin-x64
+          - runner: macos-15
+            platform: darwin-arm64
+          - runner: ubuntu-22.04
+            platform: linux-x64
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.3
+      - uses: actions/download-artifact@v4
+        with:
+          name: jetbrains-zip
+          path: release
+      - name: Install test tools
+        run: |
+          npm ci
+          npm --prefix packages/language-server ci
+      - name: Exercise packaged runtime without system Node
+        env:
+          QTN_TEST_PLATFORM: ${{ matrix.platform }}
+        run: npm run test:package -- jetbrains release/QtnLSP-jetbrains.zip
+
+  publish-jetbrains:
+    needs: verify-packages
+    if: inputs.version != '' && vars.JETBRAINS_MARKETPLACE_LISTED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: jetbrains-zip
+          path: release
+      # Publish the exact signed ZIP tested on all six platforms, without rebuilding.
+      - name: Publish to JetBrains Marketplace
+        env:
+          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+        run: |
+          curl --fail --show-error --silent \
+            --header "Authorization: Bearer $PUBLISH_TOKEN" \
+            -F xmlId=com.qtn.syntax-highlighting \
+            -F file=@release/QtnLSP-jetbrains.zip \
+            https://plugins.jetbrains.com/api/updates/upload
+
+  publish-vs:
+    needs: [build-vs, verify-packages]
+    if: inputs.version != ''
+    runs-on: windows-latest
+    timeout-minutes: 10
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: vs-vsix
+          path: release
 
       # 버전 릴리스이고 VSCE_PAT가 있으면 VS Marketplace에 게시. VSCE_PAT는 VSCode와 공유한다
       # (둘 다 marketplace.visualstudio.com / Azure DevOps PAT). PAT 미설정 시 자동 스킵.

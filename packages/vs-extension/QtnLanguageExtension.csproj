@@ -22,6 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.Shell.15.0" Version="17.12.40392" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435" />
     <PackageReference Include="Microsoft.VisualStudio.LanguageServer.Client" Version="17.12.48" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.13" />
@@ -29,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\..\dist\node-runtimes\win-x64\node.exe;..\..\dist\node-runtimes\win-x64\LICENSE;..\..\dist\node-runtimes\win-x64\runtime.json">
+      <Link>runtimes\win-x64\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
     <Content Include="QtnLanguage.pkgdef">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <IncludeInVSIX>true</IncludeInVSIX>
@@ -59,6 +65,10 @@
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Target Name="VerifyBundledRuntime" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('..\language-server\dist\server.js')" Text="Missing QTN server bundle. Run npm run bundle:server at the repository root." />
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)\..\..\scripts\prepare-node-runtime.mjs&quot; --target=vs --check" />
+  </Target>
   <!-- VsSDK.targets는 SDK targets 이후에 import해야 $(TargetName), $(OutDir) 등이 올바르게 설정됨 -->
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
 </Project>

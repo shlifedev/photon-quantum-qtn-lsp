@@ -18,6 +18,8 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 
 ## Installation
 
+VS and Rider include a private Node.js runtime for QTN IntelliSense. No separate Node.js installation or PATH setup is needed, and no runtime is downloaded when the extension starts. VSCode uses its built-in runtime.
+
 ### VSCode
 - **Marketplace**: [Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — or open the **Extensions** view in VSCode and search for `Quantum DSL (QTN)`.
 - **CLI**: `code --install-extension shlifedev.qtn-syntax-highlighting`
@@ -33,7 +35,7 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 ## Build
 
 [Docker](https://www.docker.com/) required. No other local toolchain needed.
-For local Node-based development, use Node.js 20 to match CI.
+For local Node-based development, use Node.js 22 to match CI. VS and Rider builds download checksum-pinned Node.js 22.23.3 binaries; packaged extensions are larger because they include the runtime. See [runtime packaging and verification](docs/RUNTIME_PACKAGING.md).
 
 ```bash
 sh scripts/build.sh all        # sync + test + build all plugins

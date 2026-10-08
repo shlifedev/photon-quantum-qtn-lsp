@@ -17,6 +17,7 @@ repositories {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     intellijPlatform {
         rider(providers.gradleProperty("platformVersion").get())
         bundledPlugin("org.jetbrains.plugins.textmate")
@@ -66,11 +67,25 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+val bundledRuntimeRoot = layout.projectDirectory.dir("../../dist/node-runtimes")
+val verifyBundledRuntimes by tasks.registering(Exec::class) {
+    commandLine("node", "../../scripts/prepare-node-runtime.mjs", "--target=jetbrains", "--check")
+}
+
 tasks {
     buildPlugin {
         archiveVersion.set("")
+        eachFile {
+            if (path.contains("/runtimes/") && name == "node") permissions { unix("rwxr-xr-x") }
+        }
+        doLast {
+            check(archiveFile.get().asFile.length() < 400_000_000L) {
+                "Rider plugin exceeds the Marketplace 400 MB limit"
+            }
+        }
     }
     prepareSandbox {
+        dependsOn(verifyBundledRuntimes)
         doFirst {
             // webpack 번들은 의존성까지 한 파일에 들어 있어 node_modules를 동봉할 필요가 없다.
             check(file("../language-server/dist/server.js").exists()) {
@@ -83,6 +98,13 @@ tasks {
         // 단일 webpack 번들 (QtnLspServerSupportProvider가 기대하는 out/ 경로 유지)
         from("../language-server/dist") {
             into("${intellijPlatform.projectName.get()}/language-server/out")
+        }
+        from(bundledRuntimeRoot) {
+            into("${intellijPlatform.projectName.get()}/runtimes")
+            include("*/node", "*/node.exe", "*/LICENSE", "*/runtime.json")
+            eachFile {
+                if (name == "node") permissions { unix("rwxr-xr-x") }
+            }
         }
     }
 }

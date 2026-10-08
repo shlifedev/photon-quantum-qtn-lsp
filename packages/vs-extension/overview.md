@@ -13,7 +13,9 @@ Syntax highlighting and Language Server support for [Photon Quantum 3](https://d
 ## Requirements
 
 - Visual Studio 2022 (17.0+)
-- The extension bundles its own Language Server; no extra setup is required.
+- The extension bundles its Language Server and a private Node.js runtime. No separate Node.js installation or PATH setup is required, even for Unity/C# projects. No runtime download occurs at startup.
+
+The VSIX is larger because it includes the runtime. If IntelliSense cannot start, syntax highlighting remains available; check **Output → QTN Language Server** for details and update/reinstall the extension.
 
 ## Links
 

@@ -5,9 +5,13 @@
     <description><![CDATA[
         Syntax highlighting and Language Server support for Photon Quantum3 DSL (.qtn) files in JetBrains Rider,
         including autocomplete, go-to-definition, hover information, and symbols.
+        Includes a private Node.js runtime for Windows, macOS, and Linux (x64 and arm64).
+        No separate Node.js installation, PATH setup, or startup download is required.
     ]]></description>
 
     <change-notes><![CDATA[
+        <p>Bundled Node.js 22.23.3 for QTN IntelliSense: installing Node.js separately is no longer required.
+        The plugin download is larger because it includes runtimes for all supported platforms.</p>
         <b>1.1.11</b>
         <ul>
             <li>Removed internal JetBrains Platform API usage for Rider 2026.2 EAP compatibility.</li>

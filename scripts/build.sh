@@ -70,6 +70,7 @@ cmd_vs() {
     npm --prefix "$ROOT_DIR" ci --prefer-offline
     npm --prefix "$ROOT_DIR/packages/language-server" ci --prefer-offline
     npm --prefix "$ROOT_DIR" run bundle:server
+    npm --prefix "$ROOT_DIR" run prepare:runtimes -- --target=vs
 
     log "Building Visual Studio extension..."
     dotnet build "$ROOT_DIR/packages/vs-extension/QtnLanguageExtension.csproj" -c Release
@@ -80,6 +81,7 @@ cmd_vs() {
         error "No .vsix file was produced. Visual Studio VSIX packaging usually requires Windows."
         exit 1
     fi
+    node "$ROOT_DIR/scripts/test-packaged-server.mjs" vs "$VSIX"
     cp "$VSIX" "$ROOT_DIR/dist/vs/"
     log "Visual Studio extension built -> dist/vs/"
 }

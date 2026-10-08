@@ -23,6 +23,7 @@ services:
       service: builder
     command: >
       bash -c "
+        cd /workspace && npm ci --prefer-offline && npm run test:runtimes &&
         cd /workspace/packages/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
         cd /workspace/packages/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap
       "
@@ -49,8 +50,9 @@ services:
         cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/packages/language-server && npm ci --prefer-offline &&
-        cd /workspace && npm run bundle:server &&
-        cd /workspace/packages/jetbrains-plugin && ./gradlew buildPlugin --build-cache &&
+        cd /workspace && npm run bundle:server && npm run prepare:runtimes -- --target=jetbrains &&
+        cd /workspace/packages/jetbrains-plugin && ./gradlew test buildPlugin --build-cache &&
+        cd /workspace && node scripts/test-packaged-server.mjs jetbrains packages/jetbrains-plugin/build/distributions/qtn-syntax-highlighting.zip &&
         mkdir -p /workspace/dist/jetbrains &&
         cp /workspace/packages/jetbrains-plugin/build/distributions/*.zip /workspace/dist/jetbrains/
       "
@@ -65,6 +67,7 @@ services:
         cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
         cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vs-extension/Grammars/qtn.tmLanguage.json &&
         echo '=== Test ===' &&
+        cd /workspace && npm ci --prefer-offline && npm run test:runtimes &&
         cd /workspace/packages/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
         cd /workspace/packages/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap &&
         echo '=== Build VSCode ===' &&
@@ -72,8 +75,9 @@ services:
         cd /workspace/packages/language-server && npm ci --prefer-offline &&
         cd /workspace/packages/vscode-extension && npx vsce package --no-dependencies &&
         echo '=== Build JetBrains ===' &&
-        cd /workspace && npm run bundle:server &&
-        cd /workspace/packages/jetbrains-plugin && ./gradlew buildPlugin --build-cache &&
+        cd /workspace && npm run bundle:server && npm run prepare:runtimes -- --target=jetbrains &&
+        cd /workspace/packages/jetbrains-plugin && ./gradlew test buildPlugin --build-cache &&
+        cd /workspace && node scripts/test-packaged-server.mjs jetbrains packages/jetbrains-plugin/build/distributions/qtn-syntax-highlighting.zip &&
         echo '=== Copy artifacts to dist ===' &&
         mkdir -p /workspace/dist/vscode /workspace/dist/jetbrains &&
         cp /workspace/packages/vscode-extension/*.vsix /workspace/dist/vscode/ &&

@@ -18,6 +18,8 @@ Photon Quantum3 DSL(`.qtn`)檔案的語法高亮與基於LSP的IntelliSense。
 
 ## 安裝
 
+Visual Studio 和 Rider 擴充功能已包含 QTN IntelliSense 使用的 Node.js 執行環境。無需另外安裝 Node.js 或設定 PATH，啟動擴充功能時也不會下載執行環境。VSCode 使用內建執行環境。
+
 ### VSCode
 - **市集（Marketplace）**：[Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) — 或在 VSCode 的**擴充功能（Extensions）**檢視中搜尋 `Quantum DSL (QTN)`。
 - **CLI**：`code --install-extension shlifedev.qtn-syntax-highlighting`
@@ -33,6 +35,8 @@ Photon Quantum3 DSL(`.qtn`)檔案的語法高亮與基於LSP的IntelliSense。
 ## 建置
 
 需要 [Docker](https://www.docker.com/)。無需其他本地工具鏈。
+
+從原始碼在本機建置時請使用 Node.js 22。VS 與 Rider 建置會下載並驗證固定版本 Node.js 22.23.3 的校驗碼。因內含執行環境，發佈檔案會變大。[封裝驗證說明](RUNTIME_PACKAGING.md)。
 
 ```bash
 sh scripts/build.sh all        # 同步 + 測試 + 建置所有外掛
