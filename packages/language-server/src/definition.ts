@@ -9,18 +9,18 @@ import { getIdentifierAtPosition } from './text-navigation.js';
 
 /**
  * Handle "Go to Definition" request.
- * Returns the location of the symbol definition if found.
+ * Returns all declaration sites for a symbol, including partial definitions.
  *
  * @param params - LSP definition request parameters (contains position)
  * @param projectModel - Project model with symbol table
  * @param documents - Document manager
- * @returns Location of definition, or null if not found or builtin
+ * @returns One location, multiple declaration locations, or null for unresolved/builtin names
  */
 export function handleDefinition(
   params: DefinitionParams,
   projectModel: ProjectModel,
   documents: TextDocuments<TextDocument>
-): Location | null {
+): Location | Location[] | null {
   // Get the document at the requested URI
   const document = documents.get(params.textDocument.uri);
   if (!document) {
@@ -35,5 +35,6 @@ export function handleDefinition(
 
   // Look up the symbol in the project model
   // Returns null for builtins or undefined symbols
-  return projectModel.findDefinition(word);
+  const locations = projectModel.findDefinitions(word);
+  return locations.length > 1 ? locations : locations[0] ?? null;
 }

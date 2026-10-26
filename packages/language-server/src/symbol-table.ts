@@ -32,6 +32,7 @@ export interface SymbolInfo {
   detail: string;
   children: SymbolInfo[];
   source: 'builtin' | 'user' | 'import';
+  declarations?: Location[];
 }
 
 interface SearchEntry {
@@ -107,12 +108,14 @@ export class SymbolTable {
   private typeSearchEntries: SearchEntry[] = [];
   private constantSearchEntries: SearchEntry[] = [];
   private searchCacheDirty = true;
+  private userDeclarations = new Map<string, SymbolInfo[]>();
 
   // Build symbol table from parsed QTN document
   buildFromDocument(doc: QtnDocument): void {
     this.types.clear();
     this.constants.clear();
     this.imports = [];
+    this.userDeclarations.clear();
     this.invalidateSearchCache();
 
     for (const def of doc.definitions) {
@@ -233,13 +236,13 @@ export class SymbolTable {
     const symbol: SymbolInfo = {
       name: def.name,
       kind: nodeKindToSymbolKind(def.kind),
-      location: createLocation(fileUri, def.range),
+      location: createLocation(fileUri, def.nameRange ?? def.range),
       detail,
       children,
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.addUserSymbol(symbol);
   }
 
   // Process event definition
@@ -257,13 +260,13 @@ export class SymbolTable {
     const symbol: SymbolInfo = {
       name: def.name,
       kind: SymbolKind.Event,
-      location: createLocation(fileUri, def.range),
+      location: createLocation(fileUri, def.nameRange ?? def.range),
       detail,
       children,
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.addUserSymbol(symbol);
   }
 
   // Process signal definition
@@ -274,13 +277,13 @@ export class SymbolTable {
     const symbol: SymbolInfo = {
       name: def.name,
       kind: SymbolKind.Function,
-      location: createLocation(fileUri, def.range),
+      location: createLocation(fileUri, def.nameRange ?? def.range),
       detail,
       children,
       source: 'user',
     };
 
-    this.types.set(def.name, symbol);
+    this.addUserSymbol(symbol, false);
   }
 
   // Process input definition
@@ -302,7 +305,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set('input', symbol);
+    this.addUserSymbol(symbol);
   }
 
   // Process global definition
@@ -324,7 +327,7 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.types.set('global', symbol);
+    this.addUserSymbol(symbol);
   }
 
   // Process #define constant
@@ -338,7 +341,24 @@ export class SymbolTable {
       source: 'user',
     };
 
-    this.constants.set(def.name, symbol);
+    this.addUserSymbol(symbol, false, this.constants);
+  }
+
+  /** Keep every declaration; aggregate members for types split across files. */
+  private addUserSymbol(symbol: SymbolInfo, mergeChildren = true, target = this.types): void {
+    const key = `${target === this.constants ? 'constant' : 'type'}:${symbol.name}`;
+    const parts = this.userDeclarations.get(key) ?? [];
+    parts.push(symbol);
+    parts.sort((a, b) => compareLocations(a.location, b.location));
+    this.userDeclarations.set(key, parts);
+    const first = parts[0];
+    target.set(symbol.name, {
+      ...first,
+      declarations: parts.map(part => part.location),
+      children: mergeChildren
+        ? parts.filter(part => part.kind === first.kind).flatMap(part => part.children)
+        : first.children,
+    });
   }
 
   // Create field symbol
@@ -509,4 +529,9 @@ export class SymbolTable {
   private invalidateSearchCache(): void {
     this.searchCacheDirty = true;
   }
+}
+
+function compareLocations(a: Location, b: Location): number {
+  if (a.uri !== b.uri) return a.uri < b.uri ? -1 : 1;
+  return a.range.start.line - b.range.start.line || a.range.start.character - b.range.start.character;
 }

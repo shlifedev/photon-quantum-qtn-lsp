@@ -21,9 +21,10 @@ services:
       service: builder
     command: >
       bash -c "
-        cd /workspace && npm ci --prefer-offline && npm run test:runtimes &&
+        cd /workspace && npm ci --prefer-offline && npm run test:tools &&
         cd /workspace/packages/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
-        cd /workspace/packages/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap
+        cd /workspace/packages/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap &&
+        cd /workspace && npm run typecheck
       "
 
   vscode:
@@ -63,9 +64,10 @@ services:
         echo '=== Sync grammar ===' &&
         node /workspace/scripts/sync-grammar.mjs &&
         echo '=== Test ===' &&
-        cd /workspace && npm ci --prefer-offline && npm run test:runtimes &&
+        cd /workspace && npm ci --prefer-offline && npm run test:tools &&
         cd /workspace/packages/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&
         cd /workspace/packages/vscode-extension && npm ci --prefer-offline && npm test && npm run test:snap &&
+        cd /workspace && npm run typecheck &&
         echo '=== Build VSCode ===' &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/packages/language-server && npm ci --prefer-offline &&

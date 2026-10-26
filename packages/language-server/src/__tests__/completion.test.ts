@@ -151,3 +151,12 @@ describe('Completion context regressions', () => {
     expect(complete('// comment\rinput {\r', 2, 0)).toContain('button');
   });
 });
+
+describe('Valid field type suggestions', () => {
+  it('does not suggest events, signals, input, or global blocks as field types', () => {
+    const source = 'event OnHit {}\nsignal OnDamage();\ninput {}\nglobal {}\nstruct Stats {}\ncomponent Player {\n';
+    const labels = complete(source, 6, 0);
+    expect(labels).toContain('Stats');
+    for (const name of ['OnHit', 'OnDamage', 'input', 'global']) expect(labels).not.toContain(name);
+  });
+});

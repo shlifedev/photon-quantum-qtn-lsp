@@ -12,7 +12,8 @@
     "watch": "tsc -watch -p .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "typecheck": "tsc --noEmit -p . && tsc -p tsconfig.test.json"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",

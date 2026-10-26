@@ -35,6 +35,7 @@ verification-*/
 # AI tooling (local only)
 .claude/
 .specify/
+.artifacts/
 
 # Plugin signing keys (절대 커밋 금지)
 *.pem

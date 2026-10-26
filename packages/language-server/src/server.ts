@@ -22,7 +22,7 @@ import { handleHover } from './hover.js';
 import { handleDocumentSymbol, handleWorkspaceSymbol } from './symbols.js';
 import { handleSemanticTokensFull, tokenTypes, tokenModifiers } from './semantic-tokens.js';
 import { setLocale } from './locale.js';
-import { shouldSkipDirectory } from './workspace-index.js';
+import { shouldSkipDirectory, isExcludedWorkspaceFile } from './workspace-index.js';
 import { normalizeUri } from './uri-utils.js';
 
 // Create the transport selected by the client (--stdio for packaged extensions).
@@ -97,13 +97,18 @@ documents.onDidChangeContent((change) => {
 
 // Document close handler - keep workspace files indexed from disk.
 documents.onDidClose((event) => {
-  void fileLoader.load(event.document.uri);
+  if (isExcludedWorkspaceFile(event.document.uri, workspaceRoots)) {
+    fileLoader.deleteFile(event.document.uri);
+  } else {
+    void fileLoader.load(event.document.uri);
+  }
 });
 
 // Handle workspace file changes (external edits, file creation/deletion)
 connection.onDidChangeWatchedFiles((params) => {
   for (const change of params.changes) {
     if (!change.uri.endsWith('.qtn')) continue;
+    if (isExcludedWorkspaceFile(change.uri, workspaceRoots)) continue;
 
     switch (change.type) {
       case FileChangeType.Deleted:

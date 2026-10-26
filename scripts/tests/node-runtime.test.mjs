@@ -58,3 +58,47 @@ test('package inspection rejects a missing server', () => fixture(async (directo
   await fs.writeFile(archive, zipSync({ 'plugin/META-INF/plugin.xml': strToU8('<idea-plugin/>') }));
   await assert.rejects(unpackPackage(archive, 'jetbrains', path.join(directory, 'output')), /exactly one QTN server bundle/);
 }));
+
+async function vscodeFiles() {
+  return {
+    'extension/package.json': strToU8(JSON.stringify({
+      main: './dist/extension.js',
+      contributes: { grammars: [{ language: 'qtn', path: './syntaxes/qtn.tmLanguage.json' }] },
+    })),
+    'extension/dist/extension.js': strToU8('// client fixture'),
+    'extension/dist/server.js': strToU8('// server fixture'),
+    'extension/language-configuration.json': strToU8('{}'),
+    'extension/syntaxes/qtn.tmLanguage.json': await fs.readFile(new URL('../../packages/shared/syntaxes/qtn.tmLanguage.json', import.meta.url)),
+  };
+}
+
+test('VSCode package inspection requires the client and server bundles', () => fixture(async directory => {
+  const archive = path.join(directory, 'qtn.vsix');
+  const files = await vscodeFiles();
+  delete files['extension/dist/extension.js'];
+  await fs.writeFile(archive, zipSync(files));
+  await assert.rejects(unpackPackage(archive, 'vscode', path.join(directory, 'output')), /Missing VSCode package file/);
+}));
+
+test('VSCode package inspection rejects stale grammar', () => fixture(async directory => {
+  const archive = path.join(directory, 'qtn.vsix');
+  const files = await vscodeFiles();
+  files['extension/syntaxes/qtn.tmLanguage.json'] = strToU8('{}');
+  await fs.writeFile(archive, zipSync(files));
+  await assert.rejects(unpackPackage(archive, 'vscode', path.join(directory, 'output')), /Packaged grammar is stale/);
+}));
+
+test('VSCode package inspection rejects an incorrect manifest entry point', () => fixture(async directory => {
+  const archive = path.join(directory, 'qtn.vsix');
+  const files = await vscodeFiles();
+  files['extension/package.json'] = strToU8(JSON.stringify({ main: './out/extension.js' }));
+  await fs.writeFile(archive, zipSync(files));
+  await assert.rejects(unpackPackage(archive, 'vscode', path.join(directory, 'output')), /entry point/);
+}));
+
+test('VSCode package inspection accepts a self-contained extension', () => fixture(async directory => {
+  const archive = path.join(directory, 'qtn.vsix');
+  await fs.writeFile(archive, zipSync(await vscodeFiles()));
+  const server = await unpackPackage(archive, 'vscode', path.join(directory, 'output'));
+  assert.equal(await fs.readFile(server, 'utf8'), '// server fixture');
+}));

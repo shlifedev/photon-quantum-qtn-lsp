@@ -220,7 +220,7 @@ describe('Parser recovery regressions', () => {
     const result = parse('\uFEFFstruct First { FP Value; }', 'test://bom.qtn');
     expect(result.parseErrors).toEqual([]);
     expect(result.definitions.map(d => d.name)).toEqual(['First']);
-    expect((result.definitions[0] as TypeDefinition).nameRange.start.character).toBe(8);
+    expect((result.definitions[0] as TypeDefinition).nameRange?.start.character).toBe(8);
   });
 
   it.each(['!', 'singleton', 'struct Broken'])('keeps a declaration after %s', (prefix) => {

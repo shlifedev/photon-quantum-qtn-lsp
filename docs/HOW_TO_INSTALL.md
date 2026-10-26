@@ -58,7 +58,7 @@ Rider 전용 플러그인입니다. IntelliJ IDEA는 지원 대상으로 선언�
 - 타입 이름 위의 hover 설명과 사용자 정의 타입 참조의 정의 이동
 - 문서 구조와 워크스페이스 심볼 검색
 
-공유 언어 서버는 타입 참조의 semantic token도 제공합니다. 초기 워크스페이스 검색은 Unity의 `Library`, `Temp` 등 빌드·캐시 디렉토리를 제외합니다. 편집 중인 문서는 저장된 파일보다 우선하며, 문서를 닫으면 디스크 내용으로 다시 읽습니다.
+공유 언어 서버는 타입 참조의 semantic token도 제공합니다. 워크스페이스 검색과 파일 변경 알림은 Unity의 `Library`, `Temp` 등 빌드·캐시 디렉토리를 제외합니다. 이 경로의 파일도 직접 열면 편집 기능을 사용할 수 있으며 닫을 때 인덱스에서 제거합니다. 일반 소스 파일은 열린 문서가 디스크보다 우선하며, 닫을 때 디스크 내용으로 다시 읽습니다. 여러 파일로 분할한 타입은 모든 선언 위치와 필드를 유지합니다.
 
 컴파일 오류 진단 발행, 코드 포매팅, rename은 제공하지 않습니다. 실제 DSL 유효성은 Quantum 컴파일러로 확인하세요. 지원 문법과 예제는 [DSL.md](DSL.md)를 참고하세요.
 
@@ -88,14 +88,13 @@ bash scripts/build.sh vs              # dist/vs/*.vsix
 Node.js 22.23.3와 npm을 준비하고 저장소 루트에서 실행합니다.
 
 ```bash
-npm ci
-npm --prefix packages/language-server ci
-npm --prefix packages/vscode-extension ci
-npm run sync-grammar
+npm run setup
 npm test
 npm run compile
 npm run webpack
 ```
+
+`npm run setup`은 세 패키지의 의존성 설치와 문법 동기화를 수행합니다. nvm을 사용한다면 먼저 `nvm install && nvm use`로 CI와 같은 `.nvmrc` 버전을 선택하세요. `npm run typecheck`는 소스·테스트 코드의 타입을 검사하며 `npm test`에도 포함되어 있습니다.
 
 `npm run check:grammar`는 복사본이 공유 원본과 같은지 검사합니다. 문법은 `packages/shared/syntaxes/qtn.tmLanguage.json`에서, LSP 기능은 `packages/language-server/src/`에서 수정하세요.
 
@@ -105,6 +104,8 @@ VSCode 패키지 생성:
 cd packages/vscode-extension
 npx vsce package --no-dependencies
 ```
+
+VSCode 패키지를 만든 뒤 저장소 루트에서 `npm run test:package -- vscode <생성한-vsix-경로>`로 실제 번들의 시작·LSP 응답과 문법 포함 여부를 검사할 수 있습니다. CI에서도 이 검사를 실행합니다.
 
 로컬 Rider 빌드는 **JDK 21**이 필요합니다. 서버 번들·런타임을 먼저 준비하는 [Rider 빌드 절차](../packages/jetbrains-plugin/README.md#building-from-source)를 따르세요. `build.sh`는 호스트 JDK를 자동 전환하지 않습니다.
 

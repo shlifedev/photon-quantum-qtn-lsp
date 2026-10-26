@@ -81,3 +81,32 @@ input {
     expect(names).not.toContain('pragma');
   });
 });
+
+describe('Symbol presentation regressions', () => {
+  it('finds using directives and pragmas when a query is entered', () => {
+    const { projectModel } = setupDocument('using Game.Core;\n#pragma max_players 8');
+    expect(handleWorkspaceSymbol({ query: 'Core' }, projectModel).map(s => s.name)).toEqual(['Game.Core']);
+    expect(handleWorkspaceSymbol({ query: 'max_players' }, projectModel).map(s => s.name)).toEqual(['#pragma max_players']);
+  });
+
+  it('selects the type name when navigating the document outline', () => {
+    const { projectModel, uri } = setupDocument('component Player { FP Health; }');
+    const [symbol] = handleDocumentSymbol({ textDocument: { uri } }, projectModel);
+    expect(symbol.selectionRange).toEqual({ start: { line: 0, character: 10 }, end: { line: 0, character: 16 } });
+    expect(symbol.range.end.character).toBe(31);
+  });
+
+  it('preserves nullable suffixes in field and nested generic descriptions', () => {
+    const { projectModel, uri } = setupDocument('component Stats { FP? Health; list<FP?> Values; }');
+    const [symbol] = handleDocumentSymbol({ textDocument: { uri } }, projectModel);
+    expect(symbol.children?.map(field => field.detail)).toEqual(['FP?', 'list<FP?>']);
+  });
+});
+
+describe('Incomplete declaration outline ranges', () => {
+  it.each(['component ', 'struct ', 'event ', 'signal '])('keeps selection inside the declaration while typing %s', source => {
+    const { projectModel, uri } = setupDocument(source);
+    const [symbol] = handleDocumentSymbol({ textDocument: { uri } }, projectModel);
+    expect(symbol.selectionRange).toEqual(symbol.range);
+  });
+});

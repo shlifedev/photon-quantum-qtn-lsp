@@ -106,7 +106,7 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await connection.sendRequest(ShutdownRequest.type, undefined);
-    connection.sendNotification(ExitNotification.type, undefined);
+    await connection.sendNotification(ExitNotification.type);
   } catch {
     // ignore — we kill the process below regardless
   }
@@ -212,5 +212,28 @@ describe('LSP protocol (real server.js over stdio)', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(published).toEqual([]);
+  });
+});
+
+
+describe('Partial declaration protocol response', () => {
+  it('returns every definition site over the wire', async () => {
+    for (const [uri, text] of [
+      ['file:///virtual/parts-a.qtn', 'component SharedPlayer { FP Health; }'],
+      ['file:///virtual/parts-b.qtn', 'component SharedPlayer { int Ammo; }'],
+      ['file:///virtual/parts-use.qtn', 'struct Uses { SharedPlayer Player; }'],
+    ]) {
+      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        textDocument: { uri, languageId: 'qtn', version: 1, text },
+      });
+    }
+    const definitions = await connection.sendRequest(DefinitionRequest.type, {
+      textDocument: { uri: 'file:///virtual/parts-use.qtn' },
+      position: { line: 0, character: 18 },
+    });
+    expect(definitions).toEqual([
+      { uri: 'file:///virtual/parts-a.qtn', range: { start: { line: 0, character: 10 }, end: { line: 0, character: 22 } } },
+      { uri: 'file:///virtual/parts-b.qtn', range: { start: { line: 0, character: 10 }, end: { line: 0, character: 22 } } },
+    ]);
   });
 });

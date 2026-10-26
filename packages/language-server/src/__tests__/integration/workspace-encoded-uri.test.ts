@@ -118,7 +118,7 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await connection.sendRequest(ShutdownRequest.type, undefined);
-    connection.sendNotification(ExitNotification.type, undefined);
+    await connection.sendNotification(ExitNotification.type);
   } catch {
     // ignore
   }
@@ -182,5 +182,37 @@ describe('Workspace file lifecycle over LSP', () => {
       changes: [{ uri: diskUri, type: FileChangeType.Created }],
     });
     await expect.poll(names).toEqual(['LifecycleRecreated']);
+  });
+});
+
+
+describe('Generated file watcher events', () => {
+  it('keeps generated copies out of search while allowing explicitly opened files', async () => {
+    const file = path.join(workspaceDir, 'Library', 'copy.qtn');
+    const uri = vscodeStyleUri(file);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'struct GeneratedCopy {}');
+    const names = async () => (await connection.sendRequest(WorkspaceSymbolRequest.type,
+      { query: 'GeneratedCopy' }))?.map(symbol => symbol.name);
+
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri, type: FileChangeType.Created }],
+    });
+    // Wait for an ordinary file to be indexed before checking the cache result.
+    const barrier = path.join(workspaceDir, 'barrier.qtn');
+    fs.writeFileSync(barrier, 'struct WatcherBarrier {}');
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri: pathToFileURL(barrier).href, type: FileChangeType.Created }],
+    });
+    await expect.poll(async () => (await connection.sendRequest(WorkspaceSymbolRequest.type,
+      { query: 'WatcherBarrier' }))?.length).toBe(1);
+    expect(await names()).toEqual([]);
+
+    await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri, languageId: 'qtn', version: 1, text: 'struct GeneratedCopy {}' },
+    });
+    expect(await names()).toEqual(['GeneratedCopy']);
+    await connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument: { uri } });
+    expect(await names()).toEqual([]);
   });
 });

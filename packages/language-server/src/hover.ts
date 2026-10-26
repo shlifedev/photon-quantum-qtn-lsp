@@ -195,9 +195,10 @@ function createUserDefinedHover(info: import('./symbol-table.js').SymbolInfo): H
   // Add declaration location (skip for builtins)
   if (info.source === 'user' && info.location.uri !== 'builtin://') {
     // Extract filename from URI
-    const filename = info.location.uri.split('/').pop() || info.location.uri;
+    const filenames = [...new Set((info.declarations ?? [info.location]).map(location =>
+      location.uri.split('/').pop() || location.uri))];
     const declaredLabel = locale === 'ko' ? '선언 위치' : 'Declared in';
-    markdown += `\n\n${declaredLabel}: \`${filename}\``;
+    markdown += `\n\n${declaredLabel}: ${filenames.map(filename => `\`${filename}\``).join(', ')}`;
   }
 
   return {

@@ -7,11 +7,12 @@ import { setupDocument, pos } from './helpers.js';
 
 function define(source: string, line: number, character: number) {
   const { projectModel, documents, uri } = setupDocument(source);
-  return handleDefinition(
+  const result = handleDefinition(
     { textDocument: { uri }, position: pos(line, character) },
     projectModel,
     documents,
   );
+  return Array.isArray(result) ? result[0] : result;
 }
 
 describe('Definition handler', () => {

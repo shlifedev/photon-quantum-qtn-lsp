@@ -185,7 +185,8 @@ function getFieldTypeCompletions(projectModel: ProjectModel): CompletionItem[] {
   // User-defined types from symbol table
   const symbolTable = projectModel.getSymbolTable();
   for (const symbol of symbolTable.types.values()) {
-    if (symbol.source === 'user' || symbol.source === 'import') {
+    if ((symbol.source === 'user' || symbol.source === 'import') &&
+        (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Struct || symbol.kind === SymbolKind.Enum)) {
       items.push({
         label: symbol.name,
         kind: symbolKindToCompletionItemKind(symbol.kind),

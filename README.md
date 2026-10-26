@@ -49,10 +49,7 @@ Visual Studio VSIX builds run separately on Windows with Node.js 22.23.3 and the
 ### Local development and validation
 
 ```bash
-npm ci
-npm --prefix packages/language-server ci
-npm --prefix packages/vscode-extension ci
-npm run sync-grammar
+npm run setup
 npm test
 npm run compile
 npm run webpack
@@ -60,9 +57,15 @@ cd packages/vscode-extension
 npx vsce package --no-dependencies
 ```
 
-`npm test` checks grammar synchronization, runtime packaging helpers, language-server unit/protocol tests, and TextMate unit/snapshot tests. Rider source builds also require JDK 21; see [Rider build instructions](packages/jetbrains-plugin/README.md#building-from-source).
+`npm run setup` installs the three locked dependency sets and synchronizes grammar copies. If you use nvm, run `nvm install && nvm use` first; CI reads the same `.nvmrc`.
 
-The shared server provides completion, hover, definition lookup, document/workspace symbols, and semantic tokens for resolved type references. Workspace indexing skips build/cache directories such as Unity `Library` and `Temp`, and open buffers take precedence over disk reads. Compiler diagnostics, formatting, and rename are not provided; Quantum's compiler remains the authority for DSL validation.
+For agent-assisted work, start with [AGENTS.md](AGENTS.md) and the [development harness guide](docs/AI_DEVELOPMENT.md). `npm run doctor` checks the local prerequisites; `npm run verify` runs the full suite and saves logs plus a JSON report. Use `-- --profile quick` for fast iteration or `-- --profile package` to also build and exercise a VSCode VSIX. Repository-local skills live in `.agents/skills/`.
+
+`npm test` checks grammar synchronization, TypeScript source and test types, runtime packaging helpers, language-server unit/protocol tests, and TextMate unit/snapshot tests. Run `npm run typecheck` for a quick type check without emitting build files. Rider source builds also require JDK 21; see [Rider build instructions](packages/jetbrains-plugin/README.md#building-from-source).
+
+The shared server provides completion, hover, definition lookup, document/workspace symbols, and semantic tokens for resolved type references. Workspace scans and file watcher events exclude build/cache directories such as Unity `Library` and `Temp`. Explicitly opened buffers remain available until closed. Types split across files retain all declaration sites for definition lookup and aggregate their members in hover. Compiler diagnostics, formatting, and rename are not provided; Quantum's compiler remains the authority for DSL validation.
+
+After packaging, run `npm run test:package -- vscode packages/vscode-extension/qtn-syntax-highlighting-1.0.0.vsix` from the repository root (substitute the actual package filename). CI checks the VSIX contents and runs the extracted server with no usable system Node on PATH.
 
 Development tests use Vitest 4. The VSCode packaging tool’s MSAL dependency uses only `uuid.v4()`; a scoped override keeps it on the patched CommonJS-compatible `uuid` 11.1.1 until upstream updates its dependency.
 

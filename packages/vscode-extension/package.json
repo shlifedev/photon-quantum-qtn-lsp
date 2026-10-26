@@ -59,7 +59,8 @@
     "test:snap": "vscode-tmgrammar-snap -g syntaxes/qtn.tmLanguage.json \"tests/snap/*.qtn\"",
     "sync-grammar": "node ../../scripts/sync-grammar.mjs",
     "build": "tsc -p .",
-    "watch": "tsc -watch -p ."
+    "watch": "tsc -watch -p .",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
