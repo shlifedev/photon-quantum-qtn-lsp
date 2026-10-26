@@ -119,3 +119,35 @@ component Player {
     expect(labels).not.toContain('button');
   });
 });
+
+describe('Completion context regressions', () => {
+  it('offers import sub-keywords immediately after the space', () => {
+    const labels = complete('import ', 0, 7);
+    expect(labels).toContain('singleton');
+    expect(labels).not.toContain('event');
+  });
+
+  it.each(['// {', '/* { */', '// [ <'])('ignores delimiters in %s', (comment) => {
+    const labels = complete(`${comment}\n`, 1, 0);
+    expect(labels).toContain('component');
+    expect(labels).not.toContain('FP');
+  });
+
+  it('ignores closing braces in comments inside fields', () => {
+    const labels = complete('component Player {\n// }\n', 2, 0);
+    expect(labels).toContain('FP');
+  });
+
+  it('handles an escaped backslash before a closing string quote', () => {
+    const source = String.raw`[Tooltip("path\\")]` + '\ncomponent Player {\n';
+    expect(complete(source, 2, 0)).toContain('FP');
+  });
+
+  it('ends input context immediately after the closing brace', () => {
+    expect(complete('input {}', 0, 8)).not.toContain('button');
+  });
+
+  it('handles a CR-only line comment before an input block', () => {
+    expect(complete('// comment\rinput {\r', 2, 0)).toContain('button');
+  });
+});

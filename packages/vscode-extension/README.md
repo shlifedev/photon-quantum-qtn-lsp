@@ -107,15 +107,17 @@ Support for multiple number formats:
 ## Installation
 
 ### From VSIX File
-1. Download the extension package `qtn-syntax-highlighting-1.0.0.vsix`
+1. Download `QtnLSP-vscode.vsix` from [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases)
 2. Install it using the VS Code command line:
    ```bash
-   code --install-extension qtn-syntax-highlighting-1.0.0.vsix
+   code --install-extension QtnLSP-vscode.vsix
    ```
 3. Reload VS Code
 4. The extension will automatically activate for `.qtn` files
 
-### From VS Code Extension Marketplace (when published)
+### From VS Code Extension Marketplace
+
+[Quantum DSL (QTN) Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.qtn-syntax-highlighting) is available in the Marketplace.
 1. Open VS Code
 2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
 3. Search for "QTN" or "Quantum DSL"
@@ -133,46 +135,36 @@ Files with the `.qtn` extension will automatically be recognized and highlighted
 Create or open a `.qtn` file and start writing code. Syntax highlighting will activate automatically:
 
 ```qtn
-// Define a player component
-singleton component Player
-{
-    // Position using Quantum types
-    FPVector3 position;
-
-    // Input data structure
-    input PlayerInput
-    {
-        FPVector2 movement;
-        bool jump;
-    }
-
-    // Event definition
-    event PlayerDamaged
-    {
-        int damageAmount;
-        EntityRef damageSource;
-    }
-
-    // Synced properties
-    synced int health = 100;
-    local bool isAlive;
-
-    // Collections
-    list<EntityRef> inventory;
-    array<int>[10] scores;
+component Player {
+    FPVector3 Position;
+    int Health;
+    list<EntityRef> Inventory;
+    array<int>[10] Scores;
 }
+
+input {
+    FPVector2 Movement;
+    button Jump;
+}
+
+event PlayerDamaged {
+    int DamageAmount;
+    EntityRef DamageSource;
+}
+
+signal OnDamage(FP damage, entity_ref target);
 ```
 
 ## Requirements
 
-- Visual Studio Code 1.50.0 or higher
+- Visual Studio Code 1.82.0 or higher
 - No additional dependencies required
 
 ## Documentation
 
 For detailed information about the Photon Quantum3 DSL, refer to:
-- [Photon Quantum3 Official Documentation](https://doc.photonengine.com/en/quantum)
-- [Quantum DSL Reference](https://doc.photonengine.com/en/quantum/current/technical-details/dsl)
+- [Photon Quantum3 Official Documentation](https://doc.photonengine.com/quantum/v3)
+- [Quantum DSL Reference](https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/dsl)
 
 ## Contributing
 
@@ -180,4 +172,4 @@ To report issues or suggest improvements, please submit feedback through the app
 
 ## License
 
-This extension is provided as-is for use with Photon Quantum3 projects.
+MIT. See the repository LICENSE.

@@ -13,9 +13,7 @@ services:
       service: builder
     command: >
       bash -c "
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vscode-extension/syntaxes/qtn.tmLanguage.json &&
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vs-extension/Grammars/qtn.tmLanguage.json
+        node /workspace/scripts/sync-grammar.mjs
       "
 
   test:
@@ -33,7 +31,7 @@ services:
       service: builder
     command: >
       bash -c "
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vscode-extension/syntaxes/qtn.tmLanguage.json &&
+        node /workspace/scripts/sync-grammar.mjs &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/packages/language-server && npm ci --prefer-offline &&
         cd /workspace/packages/vscode-extension && npm ci --prefer-offline &&
@@ -47,7 +45,7 @@ services:
       service: builder
     command: >
       bash -c "
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
+        node /workspace/scripts/sync-grammar.mjs &&
         cd /workspace && npm ci --prefer-offline &&
         cd /workspace/packages/language-server && npm ci --prefer-offline &&
         cd /workspace && npm run bundle:server && npm run prepare:runtimes -- --target=jetbrains &&
@@ -63,9 +61,7 @@ services:
     command: >
       bash -c "
         echo '=== Sync grammar ===' &&
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vscode-extension/syntaxes/qtn.tmLanguage.json &&
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json &&
-        cp /workspace/packages/shared/syntaxes/qtn.tmLanguage.json /workspace/packages/vs-extension/Grammars/qtn.tmLanguage.json &&
+        node /workspace/scripts/sync-grammar.mjs &&
         echo '=== Test ===' &&
         cd /workspace && npm ci --prefer-offline && npm run test:runtimes &&
         cd /workspace/packages/language-server && npm ci --prefer-offline && npm test && npm run test:integration &&

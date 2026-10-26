@@ -15,6 +15,7 @@ import { promises as fs, type Dirent } from 'fs';
 import * as path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { ProjectModel } from './project-model.js';
+import { ProjectFileLoader } from './project-file-loader.js';
 import { handleDefinition } from './definition.js';
 import { handleCompletion } from './completion.js';
 import { handleHover } from './hover.js';
@@ -24,7 +25,7 @@ import { setLocale } from './locale.js';
 import { shouldSkipDirectory } from './workspace-index.js';
 import { normalizeUri } from './uri-utils.js';
 
-// Create LSP connection using Node IPC
+// Create the transport selected by the client (--stdio for packaged extensions).
 const connection = createConnection(ProposedFeatures.all);
 
 // Create text document manager
@@ -32,6 +33,11 @@ const documents = new TextDocuments(TextDocument);
 
 // Create project model to manage .qtn files and symbols
 const projectModel = new ProjectModel();
+const fileLoader = new ProjectFileLoader(
+  projectModel,
+  uri => findOpenDocument(uri)?.getText(),
+  message => connection.console.warn(message),
+);
 let workspaceRoots: string[] = [];
 
 const IDENTIFIER_TRIGGER_CHARACTERS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'.split('');
@@ -43,9 +49,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 
   // Read locale from initialization options
   const options = params.initializationOptions as { locale?: string } | undefined;
-  if (options?.locale?.startsWith('ko')) {
-    setLocale('ko');
-  }
+  setLocale(typeof options?.locale === 'string' && options.locale.startsWith('ko') ? 'ko' : 'en');
 
   return {
     capabilities: {
@@ -88,12 +92,12 @@ connection.onInitialized(() => {
 
 // Document change handler - update project model when documents change
 documents.onDidChangeContent((change) => {
-  projectModel.updateDocument(change.document.uri, change.document.getText());
+  fileLoader.updateOpenDocument(change.document.uri, change.document.getText());
 });
 
 // Document close handler - keep workspace files indexed from disk.
 documents.onDidClose((event) => {
-  void reloadClosedDocument(event.document.uri);
+  void fileLoader.load(event.document.uri);
 });
 
 // Handle workspace file changes (external edits, file creation/deletion)
@@ -103,12 +107,12 @@ connection.onDidChangeWatchedFiles((params) => {
 
     switch (change.type) {
       case FileChangeType.Deleted:
-        projectModel.removeDocument(change.uri);
+        fileLoader.deleteFile(change.uri);
         break;
       case FileChangeType.Created:
       case FileChangeType.Changed:
         if (!findOpenDocument(change.uri)) {
-          void loadFileIntoProject(change.uri);
+          void fileLoader.load(change.uri);
         }
         break;
     }
@@ -143,20 +147,14 @@ async function indexWorkspaceFiles(): Promise<void> {
   for (const root of workspaceRoots) {
     try {
       const files = await findQtnFiles(root);
-      await Promise.all(files.map((file) => loadFileIntoProject(pathToFileURL(file).toString())));
+      // Bound concurrent reads to avoid exhausting file descriptors in large Unity projects.
+      for (let offset = 0; offset < files.length; offset += 32) {
+        await Promise.all(files.slice(offset, offset + 32).map(file => fileLoader.load(pathToFileURL(file).toString())));
+      }
     } catch (error) {
       connection.console.warn(`Failed to index QTN workspace '${root}': ${formatError(error)}`);
     }
   }
-}
-
-async function reloadClosedDocument(uri: string): Promise<void> {
-  if (!uri.startsWith('file:')) {
-    projectModel.removeDocument(uri);
-    return;
-  }
-
-  await loadFileIntoProject(uri);
 }
 
 // TextDocuments는 클라이언트가 보낸 URI를 그대로 키로 쓰므로, 인덱서가 만든
@@ -168,31 +166,6 @@ function findOpenDocument(uri: string): TextDocument | undefined {
   }
   const normalized = normalizeUri(uri);
   return documents.all().find((doc) => normalizeUri(doc.uri) === normalized);
-}
-
-async function loadFileIntoProject(uri: string): Promise<void> {
-  const openDocument = findOpenDocument(uri);
-  if (openDocument) {
-    projectModel.updateDocument(uri, openDocument.getText());
-    return;
-  }
-
-  const filePath = uriToFilePath(uri);
-  if (!filePath) {
-    return;
-  }
-
-  try {
-    const text = await fs.readFile(filePath, 'utf8');
-    projectModel.updateDocument(uri, text);
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      projectModel.removeDocument(uri);
-      return;
-    }
-
-    connection.console.warn(`Failed to read QTN file '${uri}': ${formatError(error)}`);
-  }
 }
 
 async function findQtnFiles(root: string): Promise<string[]> {
@@ -237,46 +210,39 @@ function uriToFilePath(uri: string): string | null {
   }
 }
 
-function isMissingFileError(error: unknown): boolean {
-  return typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: string }).code === 'ENOENT';
-}
-
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 // ============================================================================
-// LSP REQUEST HANDLERS (STUBS - will be implemented in Phase 3-6)
+// LSP REQUEST HANDLERS
 // ============================================================================
 
-// T013-T014: Completion handler
+// Completion handler
 // Provides: keywords, types, fields, built-ins
 connection.onCompletion((params) => {
   return handleCompletion(params, projectModel, documents);
 });
 
-// T015-T016: Go to Definition handler
+// Go to Definition handler
 // Navigate to symbol definitions
 connection.onDefinition((params) => {
   return handleDefinition(params, projectModel, documents);
 });
 
-// T017-T018: Hover handler
+// Hover handler
 // Shows type info and documentation
 connection.onHover((params) => {
   return handleHover(params, projectModel, documents);
 });
 
-// T019-T020: Document Symbols handler
+// Document Symbols handler
 // Provides outline/structure of current file
 connection.onDocumentSymbol((params) => {
   return handleDocumentSymbol(params, projectModel);
 });
 
-// T019-T020: Workspace Symbols handler
+// Workspace Symbols handler
 // Provides project-wide symbol search
 connection.onWorkspaceSymbol((params) => {
   return handleWorkspaceSymbol(params, projectModel);

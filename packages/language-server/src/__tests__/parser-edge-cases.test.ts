@@ -57,7 +57,7 @@ describe('Parser Edge Cases', () => {
     const result = parse(source, 'test://unclosed-struct.qtn');
 
     // Should have parsed both structs despite missing }
-    expect(result.definitions.length).toBeGreaterThanOrEqual(1);
+    expect(result.definitions.map(d => d.name)).toEqual(['Incomplete', 'NextStruct']);
     expect(result.parseErrors.length).toBeGreaterThan(0);
 
     // Should have error about missing } or 'struct' keyword being unexpected
@@ -80,7 +80,7 @@ describe('Parser Edge Cases', () => {
     `;
     const result = parse(source, 'test://unclosed-component.qtn');
 
-    expect(result.definitions.length).toBeGreaterThanOrEqual(1);
+    expect(result.definitions.map(d => d.name)).toEqual(['Player', 'Enemy']);
     expect(result.parseErrors.length).toBeGreaterThan(0);
   });
 
@@ -97,7 +97,7 @@ describe('Parser Edge Cases', () => {
     `;
     const result = parse(source, 'test://unclosed-enum.qtn');
 
-    expect(result.definitions.length).toBeGreaterThanOrEqual(1);
+    expect(result.definitions.map(d => d.name)).toEqual(['Status', 'Point']);
     expect(result.parseErrors.length).toBeGreaterThan(0);
   });
 
@@ -130,7 +130,7 @@ describe('Parser Edge Cases', () => {
 
     // Should have at least one valid definition
     const validStructs = result.definitions.filter(d => d.kind === 'struct' && d.name === 'Valid');
-    expect(validStructs.length).toBeGreaterThanOrEqual(0);
+    expect(validStructs).toHaveLength(1);
 
     // Should have parse errors for invalid tokens
     expect(result.parseErrors.length).toBeGreaterThan(0);
@@ -175,7 +175,7 @@ describe('Parser Edge Cases', () => {
 
     // Should recover and find the Next component
     const components = result.definitions.filter(d => d.kind === 'component');
-    expect(components.length).toBeGreaterThanOrEqual(0);
+    expect(components.map(d => d.name)).toEqual(['Next']);
 
     // Should have multiple parse errors
     expect(result.parseErrors.length).toBeGreaterThan(0);
@@ -212,5 +212,26 @@ describe('Parser Edge Cases', () => {
     const result = parse('struct S { FP Value; }', 'test://non-nullable.qtn');
     const struct = result.definitions.find(d => d.kind === 'struct') as TypeDefinition;
     expect(struct.fields[0].typeRef.isNullable).toBe(false);
+  });
+});
+
+describe('Parser recovery regressions', () => {
+  it('accepts a UTF-8 BOM without losing the first declaration or shifting ranges', () => {
+    const result = parse('\uFEFFstruct First { FP Value; }', 'test://bom.qtn');
+    expect(result.parseErrors).toEqual([]);
+    expect(result.definitions.map(d => d.name)).toEqual(['First']);
+    expect((result.definitions[0] as TypeDefinition).nameRange.start.character).toBe(8);
+  });
+
+  it.each(['!', 'singleton', 'struct Broken'])('keeps a declaration after %s', (prefix) => {
+    const result = parse(`${prefix}\nstruct Valid { FP Value; }`, 'test://recovery.qtn');
+    expect(result.definitions.some(d => d.name === 'Valid')).toBe(true);
+  });
+
+  it('keeps enum members after a missing comma', () => {
+    const result = parse('enum State { First Second, Third }', 'test://enum.qtn');
+    expect((result.definitions[0] as TypeDefinition).enumMembers.map(m => m.name))
+      .toEqual(['First', 'Second', 'Third']);
+    expect(result.parseErrors.length).toBeGreaterThan(0);
   });
 });

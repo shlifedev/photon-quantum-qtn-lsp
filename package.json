@@ -14,7 +14,10 @@
     "bundle:server": "npm run compile:server && npm run webpack:server",
     "prepare:runtimes": "node scripts/prepare-node-runtime.mjs",
     "test:runtimes": "node --test scripts/tests/*.test.mjs",
-    "test:package": "node scripts/test-packaged-server.mjs"
+    "test:package": "node scripts/test-packaged-server.mjs",
+    "sync-grammar": "node scripts/sync-grammar.mjs",
+    "check:grammar": "node scripts/sync-grammar.mjs --check",
+    "test": "npm run check:grammar && npm run test:runtimes && npm --prefix packages/language-server test && npm --prefix packages/language-server run test:integration && npm --prefix packages/vscode-extension test && npm --prefix packages/vscode-extension run test:snap"
   },
   "devDependencies": {
     "fflate": "0.8.3",

@@ -12,7 +12,7 @@
 
 ```text
 packages/shared/syntaxes/
-└── qtn.tmLanguage.json              # 핵심 TextMate 문법 (단일 소스, 양쪽 IDE 공유)
+└── qtn.tmLanguage.json              # 핵심 TextMate 문법 (단일 소스, 세 IDE 공유)
 
 packages/vscode-extension/
 ├── package.json                      # VSCode 확장 매니페스트
@@ -22,11 +22,12 @@ packages/vscode-extension/
     ├── unit/                         # vscode-tmgrammar-test 단위 테스트
     └── snap/                         # 스냅샷 테스트
 
-packages/language-server/                      # QTN Language Server (단일 소스, 양쪽 IDE 공유)
+packages/language-server/                      # QTN Language Server (단일 소스, 세 IDE 공유)
 ├── src/
 │   ├── server.ts                     # LSP 서버 진입점
 │   ├── lexer.ts                      # 토크나이저
 │   ├── parser.ts                     # 파서 (AST 생성)
+│   ├── project-file-loader.ts        # 디스크·열린 문서 동기화 및 읽기 경합 방지
 │   ├── completion.ts                 # 자동 완성
 │   ├── definition.ts                 # 정의 이동
 │   ├── hover.ts                      # Hover 정보
@@ -40,8 +41,7 @@ packages/jetbrains-plugin/
 ├── src/main/kotlin/                  # TextMateBundleProvider + LSP 클라이언트 구현
 └── src/main/resources/
     ├── META-INF/
-    │   ├── plugin.xml                # 플러그인 매니페스트
-    │   └── lsp.xml                   # LSP extension (optional dependency)
+    │   └── plugin.xml                # TextMate + Rider LSP 플러그인 매니페스트
     └── bundles/qtn.tmbundle/
 
 packages/vs-extension/
@@ -57,7 +57,7 @@ packages/vs-extension/
     └── server.js                     # webpack 단일 번들 (node_modules 불필요)
 
 packages/tests/fixtures/
-└── sample.qtn                        # 종합 테스트 픽스처
+└── test.qtn                          # 종합 테스트 픽스처
 
 docs/
 ├── DSL.md                            # QTN DSL 전체 문법 레퍼런스
@@ -74,8 +74,8 @@ scripts/                              # build.sh, install.sh, 빌드 보조 스�
 ### 문법 파일 단일 소스 (Single Source of Truth)
 
 - **항상 `packages/shared/syntaxes/qtn.tmLanguage.json`을 편집**한다
-- 편집 후 `npm run sync-grammar` (vscode-extension/) 으로 복사
-- JetBrains 번들도 동일하게 shared/에서 복사
+- 편집 후 루트 또는 vscode-extension/에서 `npm run sync-grammar`로 세 IDE 복사본 동기화
+- `npm run check:grammar` (루트)로 복사본 일치 여부 검사
 - 절대로 `packages/vscode-extension/syntaxes/`나 `packages/jetbrains-plugin/.../Syntaxes/`를 직접 수정하지 않는다
 
 ### Language Server 단일 소스 (Single Source of Truth)
@@ -93,12 +93,12 @@ scripts/                              # build.sh, install.sh, 빌드 보조 스�
 
 ```bash
 # Docker로 빌드 (로컬 툴체인 불필요, Docker만 있으면 됨)
-sh scripts/build.sh sync          # 문법 파일 동기화
-sh scripts/build.sh test          # 테스트 실행
-sh scripts/build.sh vscode        # VSCode 확장 빌드
-sh scripts/build.sh jetbrains     # JetBrains 플러그인 빌드
-sh scripts/build.sh all           # sync + test + vscode + jetbrains
-sh scripts/build.sh clean         # 빌드 산출물 삭제
+bash scripts/build.sh sync          # 문법 파일 동기화
+bash scripts/build.sh test          # 테스트 실행
+bash scripts/build.sh vscode        # VSCode 확장 빌드
+bash scripts/build.sh jetbrains     # JetBrains 플러그인 빌드
+bash scripts/build.sh all           # sync + test + vscode + jetbrains
+bash scripts/build.sh clean         # 빌드 산출물 삭제
 ```
 
 ## TextMate 스코프 매핑
@@ -191,11 +191,11 @@ list<T>, dictionary<K,V>, hash_set<T>, array<T>[N], bitset[N]
 | 영역 | 기술 |
 |------|------|
 | 문법 정의 | TextMate Grammar (JSON) |
-| VSCode 확장 | TypeScript/Node.js 18+, `@vscode/vsce` |
+| VSCode 확장 | TypeScript/Node.js 22.23.3 (소스 빌드), `@vscode/vsce` |
 | VSCode 테스트 | `vscode-tmgrammar-test` (단위 + 스냅샷) |
-| JetBrains 플러그인 | Kotlin/JDK 17+, Gradle IntelliJ Platform Plugin 2.x |
+| JetBrains 플러그인 | Kotlin/JDK 21, Gradle IntelliJ Platform Plugin 2.x |
 | Visual Studio 확장 | C#/.NET 4.7.2, Microsoft.VSSDK.BuildTools, ILanguageClient |
-| 대상 IDE | VSCode 1.50+, JetBrains Rider 2022.3+, Visual Studio 2022 (17.0+) |
+| 대상 IDE | VSCode 1.82+, JetBrains Rider 2024.3+, Visual Studio 2022 (17.0+) |
 
 ## 범위 외
 
@@ -206,7 +206,7 @@ list<T>, dictionary<K,V>, hash_set<T>, array<T>[N], bitset[N]
 
 ## DSL 최신 참고문서
 
-https://doc.photonengine.com/ko-kr/quantum/v1/manual/quantum-dsl
+https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/dsl
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

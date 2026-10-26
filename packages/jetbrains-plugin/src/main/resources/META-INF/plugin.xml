@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin url="https://github.com/shlifedev/photon-quantum-qtn-lsp">
     <id>com.qtn.syntax-highlighting</id>
     <name>Quantum DSL (QTN) Language Support</name>
     <vendor>qtn-tools</vendor>
@@ -7,6 +7,8 @@
         including autocomplete, go-to-definition, hover information, and symbols.
         Includes a private Node.js runtime for Windows, macOS, and Linux (x64 and arm64).
         No separate Node.js installation, PATH setup, or startup download is required.
+        <p><a href="https://github.com/shlifedev/photon-quantum-qtn-lsp/blob/main/docs/HOW_TO_INSTALL.md">Installation and troubleshooting</a> ·
+        <a href="https://github.com/shlifedev/photon-quantum-qtn-lsp/issues">Report an issue</a></p>
     ]]></description>
 
     <change-notes><![CDATA[

@@ -96,7 +96,7 @@ class Lexer {
   private skipWhitespace(): void {
     while (this.pos < this.text.length) {
       const ch = this.current();
-      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r' || (this.pos === 0 && ch === '\uFEFF')) {
         this.advance();
       } else {
         break;

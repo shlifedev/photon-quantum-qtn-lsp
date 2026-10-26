@@ -36,3 +36,13 @@ component P {
     expect(loc).toBeNull();
   });
 });
+
+describe('Definition lexical context', () => {
+  it.each(['// Weapon', '/* Weapon */', '[Tooltip("Weapon")]'])('ignores %s', text => {
+    expect(define(`enum Weapon { Sword }\n${text}`, 1, text.indexOf('Weapon') + 2)).toBeNull();
+  });
+
+  it('preserves the @ prefix accepted by the parser', () => {
+    expect(define('struct @Stats {}\ncomponent P { @Stats Value; }', 1, 17)?.range.start.line).toBe(0);
+  });
+});

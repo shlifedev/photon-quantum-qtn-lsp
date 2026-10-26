@@ -12,8 +12,8 @@ Supports **VSCode**, **JetBrains Rider**, and **Visual Studio 2022**.
 
 | IDE | Version |
 |-----|---------|
-| VSCode | 1.50+ |
-| JetBrains Rider | 2022.3+ |
+| VSCode | 1.82+ |
+| JetBrains Rider | 2024.3+ |
 | Visual Studio | 2022 (17.0+) |
 
 ## Installation
@@ -28,20 +28,45 @@ VS and Rider include a private Node.js runtime for QTN IntelliSense. No separate
 - **Marketplace**: [Quantum DSL (QTN) Language Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.QtnLanguageSupport) — or in Visual Studio go to **Extensions → Manage Extensions → Online** and search for `Quantum DSL (QTN)`.
 
 ### JetBrains Rider
-- Download `QtnLSP-jetbrains.zip` from [GitHub Releases](../../releases), then **Settings → Plugins → ⚙ → Install Plugin from Disk**. _(Marketplace listing coming soon.)_
+- **Marketplace**: [Quantum DSL (QTN) Language Support](https://plugins.jetbrains.com/plugin/32137-quantum-dsl-qtn-language-support) — in Rider, open **Settings → Plugins → Marketplace** and search for `Quantum DSL (QTN)`.
+- **Manual install**: download `QtnLSP-jetbrains.zip` from [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases), then **Settings → Plugins → ⚙ → Install Plugin from Disk**.
 
-> Prefer a manual install? Every build is attached to [GitHub Releases](../../releases) as a `.vsix` / `.zip`.
+> Prefer a manual install? Every build is attached to [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases) as a `.vsix` / `.zip`.
 
 ## Build
 
 [Docker](https://www.docker.com/) required. No other local toolchain needed.
-For local Node-based development, use Node.js 22 to match CI. VS and Rider builds download checksum-pinned Node.js 22.23.3 binaries; packaged extensions are larger because they include the runtime. See [runtime packaging and verification](docs/RUNTIME_PACKAGING.md).
+For local Node-based development, use Node.js 22.23.3 to match CI. VS and Rider builds download checksum-pinned Node.js 22.23.3 binaries; packaged extensions are larger because they include the runtime. See [runtime packaging and verification](docs/RUNTIME_PACKAGING.md).
 
 ```bash
-sh scripts/build.sh all        # sync + test + build all plugins
-sh scripts/build.sh vscode     # VSCode extension only
-sh scripts/build.sh jetbrains  # JetBrains plugin only
+bash scripts/build.sh all        # sync + test + build VSCode and Rider
+bash scripts/build.sh vscode     # VSCode extension only
+bash scripts/build.sh jetbrains  # JetBrains plugin only
 ```
+
+Visual Studio VSIX builds run separately on Windows with Node.js 22.23.3 and the .NET 8 SDK: `bash scripts/build.sh vs`. The `all` command builds VSCode and Rider only.
+
+### Local development and validation
+
+```bash
+npm ci
+npm --prefix packages/language-server ci
+npm --prefix packages/vscode-extension ci
+npm run sync-grammar
+npm test
+npm run compile
+npm run webpack
+cd packages/vscode-extension
+npx vsce package --no-dependencies
+```
+
+`npm test` checks grammar synchronization, runtime packaging helpers, language-server unit/protocol tests, and TextMate unit/snapshot tests. Rider source builds also require JDK 21; see [Rider build instructions](packages/jetbrains-plugin/README.md#building-from-source).
+
+The shared server provides completion, hover, definition lookup, document/workspace symbols, and semantic tokens for resolved type references. Workspace indexing skips build/cache directories such as Unity `Library` and `Temp`, and open buffers take precedence over disk reads. Compiler diagnostics, formatting, and rename are not provided; Quantum's compiler remains the authority for DSL validation.
+
+Development tests use Vitest 4. The VSCode packaging tool’s MSAL dependency uses only `uuid.v4()`; a scoped override keeps it on the patched CommonJS-compatible `uuid` 11.1.1 until upstream updates its dependency.
+
+See the [installation guide](docs/HOW_TO_INSTALL.md) and [DSL reference](docs/DSL.md).
 
 ## Screenshot
 

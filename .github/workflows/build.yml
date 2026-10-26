@@ -49,7 +49,7 @@ jobs:
           npm --prefix packages/vscode-extension ci
 
       - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vscode-extension/syntaxes/qtn.tmLanguage.json
+        run: node scripts/sync-grammar.mjs
 
       - name: Runtime packaging tests
         run: npm run test:runtimes
@@ -94,7 +94,7 @@ jobs:
           npm --prefix packages/vscode-extension ci
 
       - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vscode-extension/syntaxes/qtn.tmLanguage.json
+        run: node scripts/sync-grammar.mjs
 
       - name: Inject version
         if: inputs.version != ''
@@ -155,7 +155,7 @@ jobs:
           npm run prepare:runtimes -- --target=jetbrains
 
       - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
+        run: node scripts/sync-grammar.mjs
 
       - name: Rider launcher tests
         working-directory: packages/jetbrains-plugin
@@ -235,7 +235,7 @@ jobs:
       - name: Sync grammar + LICENSE
         shell: bash
         run: |
-          cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vs-extension/Grammars/qtn.tmLanguage.json
+          node scripts/sync-grammar.mjs
           cp LICENSE packages/vs-extension/LICENSE
 
       - name: Inject version

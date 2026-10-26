@@ -6,7 +6,7 @@ Visual Studio ships `win-x64`. Rider ships `win-x64`, `win-arm64`, `darwin-x64`,
 
 ## Building
 
-Use Node.js 22 for source builds and JDK 21 for local Rider builds. The Docker builder supplies both. Visual Studio VSIX packaging requires Windows and the .NET SDK.
+Use Node.js 22.23.3 (the CI version) for source builds and JDK 21 for local Rider builds. The Docker builder supplies both. Visual Studio VSIX packaging requires Windows and the .NET SDK.
 
 ```sh
 npm ci

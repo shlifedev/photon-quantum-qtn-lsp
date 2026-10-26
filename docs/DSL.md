@@ -3,6 +3,8 @@
 > Quantum ECS의 게임 상태를 정의하는 `.qtn` 파일 문법 레퍼런스.
 > DSL 컴파일러는 `.qtn` 파일을 파싱하여 메모리 정렬, 직렬화, 디버깅 헬퍼가 포함된 C# partial struct를 생성한다.
 
+> Quantum 3 공식 참고: [DSL (game state)](https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/dsl). 이 문서는 문법 참고용이며, 언어 서버는 컴파일러의 모든 문법을 검증하거나 오류 진단을 발행하지 않습니다. SDK 버전별 유효성은 Quantum 컴파일러로 확인하세요.
+
 ---
 
 ## 목차

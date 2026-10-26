@@ -43,7 +43,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/__tests__/integration -> src/__tests__ -> src -> package root -> out/server.js
-const serverPath = path.resolve(here, '../../../out/server.js');
+const serverPath = process.env.QTN_TEST_SERVER ?? path.resolve(here, '../../../out/server.js');
 
 const DOC_URI = 'file:///virtual/test.qtn';
 const SOURCE = `enum WeaponType { Sword, Bow }
@@ -86,6 +86,7 @@ beforeAll(async () => {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
+    initializationOptions: { locale: 123 }, // Malformed client options must not crash initialization.
     workspaceFolders: null,
   });
   // Sanity: the server advertises the providers the IDEs rely on.

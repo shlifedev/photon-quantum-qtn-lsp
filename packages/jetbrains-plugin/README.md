@@ -26,45 +26,44 @@ The plugin supports QTN language constructs and editor workflows:
 
 ### From JetBrains Marketplace
 
-1. Open JetBrains Rider or IntelliJ IDEA
+Install [Quantum DSL (QTN) Language Support](https://plugins.jetbrains.com/plugin/32137-quantum-dsl-qtn-language-support) (plugin ID `com.qtn.syntax-highlighting`).
+
+1. Open JetBrains Rider 2024.3 or later
 2. Go to **Settings/Preferences** → **Plugins** → **Marketplace**
 3. Search for "Quantum DSL" or "QTN Language Support"
 4. Click **Install** and restart the IDE
 
 ### Manual Installation
 
-1. Build the plugin (see Building from Source below)
+1. Download `QtnLSP-jetbrains.zip` from [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases), or build from source
 2. Go to **Settings/Preferences** → **Plugins** → **Install Plugin from Disk**
-3. Select the `.zip` file from `build/distributions/`
+3. Select the downloaded ZIP (local builds use `build/distributions/qtn-syntax-highlighting.zip`)
 4. Restart the IDE
 
 ## Building from Source
 
-### Prerequisites
+Run from the repository root with **Node.js 22.23.3** and **JDK 21**:
 
-- JDK 17 or later
-- Gradle (included via gradlew)
+```bash
+npm ci
+npm --prefix packages/language-server ci
+npm run sync-grammar
+npm run bundle:server
+npm run prepare:runtimes -- --target=jetbrains
+cd packages/jetbrains-plugin
+./gradlew test buildPlugin
+cd ../..
+npm run test:package -- jetbrains packages/jetbrains-plugin/build/distributions/qtn-syntax-highlighting.zip
+```
 
-### Build Steps
+The ZIP includes the shared server bundle and checksum-pinned runtimes for all six supported OS/architecture pairs. Node.js is required for source builds, but plugin users do not need to install it. See [runtime packaging](../../docs/RUNTIME_PACKAGING.md).
 
-1. Clone or navigate to the plugin directory
-2. Build the plugin:
-   ```bash
-   ./gradlew buildPlugin
-   ```
-   The built plugin will be available at `build/distributions/qtn-syntax-highlighting.zip`
-
-3. To run the plugin in a test IDE instance:
-   ```bash
-   ./gradlew runIde
-   ```
-   This launches Rider with the plugin installed, allowing you to test syntax highlighting in real-time.
+Alternatively, with Docker running, execute `bash scripts/build.sh jetbrains` from the repository root. The output is copied to `dist/jetbrains/`. After preparing the server and runtimes, `./gradlew runIde` in this directory launches a test Rider instance.
 
 ## Compatibility
 
 - **Supported IDEs**: JetBrains Rider
-- **Minimum Version**: Rider 2022.3+ (build 223 and later)
-- **IntelliJ IDEA**: 2022.3+ with compatible build number
+- **Minimum Version**: Rider 2024.3+ (build 243 and later)
 - **TextMate Bundle**: Uses JetBrains TextMate plugin for grammar-based highlighting
 
 ## How It Works
@@ -74,8 +73,8 @@ The plugin registers a TextMate bundle (`qtn.tmbundle`) for syntax highlighting 
 ## References
 
 For detailed Quantum3 DSL documentation, visit:
-- [Photon Quantum Documentation](https://doc.photonengine.com/en-us/quantum)
-- [Photon Quantum DSL Reference](https://doc.photonengine.com/en-us/quantum/current/technical-samples/dsl)
+- [Photon Quantum Documentation](https://doc.photonengine.com/quantum/v3)
+- [Photon Quantum DSL Reference](https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/dsl)
 
 ## License
 
