@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.3
+          node-version-file: '.nvmrc'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -48,25 +48,18 @@ jobs:
           npm --prefix packages/language-server ci
           npm --prefix packages/vscode-extension ci
 
-      - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vscode-extension/syntaxes/qtn.tmLanguage.json
+      - name: Verify source, tests and tools
+        run: npm run verify
 
-      - name: Runtime packaging tests
-        run: npm run test:runtimes
-
-      - name: Language Server unit tests
-        run: npm --prefix packages/language-server test
-
-      - name: Language Server protocol integration test
-        # Spawns the real compiled server.js and drives it over the LSP wire —
-        # the exact contract VSCode, Visual Studio, and Rider all invoke.
-        run: npm --prefix packages/language-server run test:integration
-
-      - name: Grammar tests
-        run: npm --prefix packages/vscode-extension test
-
-      - name: Grammar snapshot test
-        run: npm --prefix packages/vscode-extension run test:snap
+      - name: Upload verification logs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report
+          path: .artifacts/verification/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
 
   build-vscode:
     needs: test
@@ -80,7 +73,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.3
+          node-version-file: '.nvmrc'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -94,7 +87,7 @@ jobs:
           npm --prefix packages/vscode-extension ci
 
       - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vscode-extension/syntaxes/qtn.tmLanguage.json
+        run: node scripts/sync-grammar.mjs
 
       - name: Inject version
         if: inputs.version != ''
@@ -110,6 +103,9 @@ jobs:
         run: |
           mkdir -p release
           cp packages/vscode-extension/*.vsix release/QtnLSP-vscode.vsix
+
+      - name: Verify packaged VSCode server
+        run: npm run test:package -- vscode release/QtnLSP-vscode.vsix
 
       - uses: actions/upload-artifact@v4
         with:
@@ -133,7 +129,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.3
+          node-version-file: '.nvmrc'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -155,7 +151,7 @@ jobs:
           npm run prepare:runtimes -- --target=jetbrains
 
       - name: Sync grammar
-        run: cp packages/shared/syntaxes/qtn.tmLanguage.json packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json
+        run: node scripts/sync-grammar.mjs
 
       - name: Rider launcher tests
         working-directory: packages/jetbrains-plugin
@@ -214,7 +210,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.3
+          node-version-file: '.nvmrc'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -235,7 +231,7 @@ jobs:
       - name: Sync grammar + LICENSE
         shell: bash
         run: |
-          cp packages/shared/syntaxes/qtn.tmLanguage.json packages/vs-extension/Grammars/qtn.tmLanguage.json
+          node scripts/sync-grammar.mjs
           cp LICENSE packages/vs-extension/LICENSE
 
       - name: Inject version
@@ -293,7 +289,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.3
+          node-version-file: '.nvmrc'
       - uses: actions/download-artifact@v4
         with:
           name: jetbrains-zip

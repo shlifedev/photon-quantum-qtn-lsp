@@ -36,10 +36,12 @@ export function activate(context: ExtensionContext) {
   };
 
   // Client options: document selector and file watcher
+  const watcher = workspace.createFileSystemWatcher('**/*.qtn');
+  context.subscriptions.push(watcher);
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'qtn' }],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher('**/*.qtn')
+      fileEvents: watcher
     },
     initializationOptions: {
       locale: env.language  // e.g. 'ko', 'en', 'ja'

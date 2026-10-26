@@ -9,19 +9,30 @@ import { unzipSync } from 'fflate';
 import { executableName, platformsFor, root, verifyRuntime } from './prepare-node-runtime.mjs';
 
 export async function unpackPackage(archive, kind, destination) {
+  assert.ok(['vs', 'vscode', 'jetbrains'].includes(kind), `Unknown package kind: ${kind}`);
+  const platforms = kind === 'vscode' ? [] : platformsFor(kind);
   if (kind === 'jetbrains') assert.ok((await fs.stat(archive)).size < 400_000_000, 'Rider ZIP exceeds 400 MB');
   const bytes = await fs.readFile(archive);
   const entries = [];
   unzipSync(bytes, { filter: (entry) => { entries.push(entry.name); return false; } });
-  const serverSuffix = kind === 'vs' ? 'LanguageServer/server.js' : '/language-server/out/server.js';
-  const servers = entries.filter((name) => kind === 'vs' ? name === serverSuffix : name.endsWith(serverSuffix));
+  const serverSuffix = kind === 'vscode' ? 'extension/dist/server.js' :
+    kind === 'vs' ? 'LanguageServer/server.js' : '/language-server/out/server.js';
+  const servers = entries.filter((name) => kind === 'jetbrains' ? name.endsWith(serverSuffix) : name === serverSuffix);
   assert.equal(servers.length, 1, 'Package must contain exactly one QTN server bundle');
-  const prefix = kind === 'vs' ? '' : servers[0].slice(0, -'language-server/out/server.js'.length);
+  const prefix = kind === 'vscode' ? 'extension/' :
+    kind === 'vs' ? '' : servers[0].slice(0, -'language-server/out/server.js'.length);
   const members = [servers[0]];
-  for (const platform of platformsFor(kind)) {
+  for (const platform of platforms) {
     for (const name of [executableName(platform), 'LICENSE', 'runtime.json']) {
       const member = `${prefix}runtimes/${platform}/${name}`;
       assert.ok(entries.includes(member), `Missing packaged runtime file: ${member}`);
+      members.push(member);
+    }
+  }
+  if (kind === 'vscode') {
+    for (const relative of ['dist/extension.js', 'package.json', 'syntaxes/qtn.tmLanguage.json', 'language-configuration.json']) {
+      const member = `${prefix}${relative}`;
+      assert.ok(entries.includes(member), `Missing VSCode package file: ${member}`);
       members.push(member);
     }
   }
@@ -29,17 +40,26 @@ export async function unpackPackage(archive, kind, destination) {
   for (const entry of entries.filter((name) => name.startsWith(`${prefix}runtimes/`) && !name.endsWith('/'))) {
     assert.ok(allowed.has(entry), `Unexpected runtime payload (npm/headers are not shipped): ${entry}`);
   }
-  assert.ok(!entries.some((name) => name.includes('/node_modules/')), 'Do not ship node_modules');
+  assert.ok(!entries.some((name) => /(^|\/)node_modules\//.test(name)), 'Do not ship node_modules');
   const files = unzipSync(bytes, { filter: (entry) => allowed.has(entry.name) });
   for (const member of members) {
+    assert.ok(files[member]?.length > 0, `Empty package file: ${member}`);
     const relative = member.slice(prefix.length);
     const output = path.resolve(destination, relative);
     assert.ok(output.startsWith(path.resolve(destination) + path.sep), `Unsafe package path: ${member}`);
     await fs.mkdir(path.dirname(output), { recursive: true });
     await fs.writeFile(output, files[member]);
   }
-  for (const platform of platformsFor(kind)) {
+  for (const platform of platforms) {
     await verifyRuntime(path.join(destination, 'runtimes', platform), platform);
+  }
+  if (kind === 'vscode') {
+    const metadata = JSON.parse(await fs.readFile(path.join(destination, 'package.json'), 'utf8'));
+    assert.equal(metadata.main, './dist/extension.js', 'VSCode entry point must refer to the packaged client');
+    assert.ok(metadata.contributes?.grammars?.some(grammar => grammar.language === 'qtn' &&
+      grammar.path === './syntaxes/qtn.tmLanguage.json'), 'VSCode manifest must register the packaged QTN grammar');
+    assert.deepEqual(await fs.readFile(path.join(destination, 'syntaxes/qtn.tmLanguage.json')),
+      await fs.readFile(path.join(root, 'packages/shared/syntaxes/qtn.tmLanguage.json')), 'Packaged grammar is stale');
   }
   return path.join(destination, servers[0].slice(prefix.length));
 }
@@ -110,13 +130,20 @@ async function smoke(node, server, installation, mode) {
 
 async function main() {
   const [kind, archive, ...options] = process.argv.slice(2);
-  platformsFor(kind); // Validate before touching the filesystem.
-  if (!archive || options.some((option) => option !== '--inspect-only')) throw new Error('Usage: test-packaged-server.mjs vs|jetbrains <archive> [--inspect-only]');
+  if (kind !== 'vscode') platformsFor(kind); // Validate before touching the filesystem.
+  if (!archive || options.some((option) => option !== '--inspect-only')) throw new Error('Usage: test-packaged-server.mjs vscode|vs|jetbrains <archive> [--inspect-only]');
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'qtn package 한글 '));
   try {
     const server = await unpackPackage(path.resolve(archive), kind, temporary);
-    console.log(`PASS ${kind}: all bundled runtimes, licenses, hashes and server are present`);
+    console.log(`PASS ${kind}: package contents verified`);
     if (options.includes('--inspect-only')) return;
+    if (kind === 'vscode') {
+      // VSCode provides Node itself. Exercise the extracted server with the test
+      // host's Node; this does not replace an Extension Development Host test.
+      await smoke(process.execPath, server, temporary, 'missing');
+      await smoke(process.execPath, server, temporary, 'broken');
+      return;
+    }
     const platform = `${process.platform === 'win32' ? 'win' : process.platform}-${process.arch}`;
     if (process.env.QTN_TEST_PLATFORM) assert.equal(platform, process.env.QTN_TEST_PLATFORM, 'CI runner architecture must match the runtime under test');
     assert.ok(platformsFor(kind).includes(platform), `Cannot execute ${kind} package on ${platform}`);

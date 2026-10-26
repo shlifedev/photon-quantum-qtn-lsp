@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTN Development"
+  short_description: "Implement QTN changes with focused regression tests"
+  default_prompt: "Use $qtn-development to implement this QTN change and verify its behavior."

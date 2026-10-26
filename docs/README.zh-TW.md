@@ -12,8 +12,8 @@ Photon Quantum3 DSL(`.qtn`)檔案的語法高亮與基於LSP的IntelliSense。
 
 | IDE | 版本 |
 |-----|------|
-| VSCode | 1.50+ |
-| JetBrains Rider | 2022.3+ |
+| VSCode | 1.82+ |
+| JetBrains Rider | 2024.3+ |
 | Visual Studio | 2022 (17.0+) |
 
 ## 安裝
@@ -28,7 +28,8 @@ Visual Studio 和 Rider 擴充功能已包含 QTN IntelliSense 使用的 Node.js
 - **市集（Marketplace）**：[Quantum DSL (QTN) Language Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.QtnLanguageSupport) — 或在 Visual Studio 中開啟 **Extensions → Manage Extensions → Online** 並搜尋 `Quantum DSL (QTN)`。
 
 ### JetBrains Rider
-- 從 [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases) 下載 `QtnLSP-jetbrains.zip`，然後 **Settings → Plugins → ⚙ → Install Plugin from Disk**。_(市集上架即將推出)_
+- **市集（Marketplace）**：[Quantum DSL (QTN) Language Support](https://plugins.jetbrains.com/plugin/32137-quantum-dsl-qtn-language-support) — 在 Rider 的 **Settings → Plugins → Marketplace** 搜尋 `Quantum DSL (QTN)` 並安裝。
+- **手動安裝**：從 [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases) 下載 `QtnLSP-jetbrains.zip`，然後 **Settings → Plugins → ⚙ → Install Plugin from Disk**。
 
 > 若偏好手動安裝，所有建置版本皆以 `.vsix` / `.zip` 形式附加於 [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases)。
 
@@ -36,13 +37,15 @@ Visual Studio 和 Rider 擴充功能已包含 QTN IntelliSense 使用的 Node.js
 
 需要 [Docker](https://www.docker.com/)。無需其他本地工具鏈。
 
-從原始碼在本機建置時請使用 Node.js 22。VS 與 Rider 建置會下載並驗證固定版本 Node.js 22.23.3 的校驗碼。因內含執行環境，發佈檔案會變大。[封裝驗證說明](RUNTIME_PACKAGING.md)。
+從原始碼在本機建置時請使用 Node.js 22.23.3。VS 與 Rider 建置會下載並驗證固定版本 Node.js 22.23.3 的校驗碼。因內含執行環境，發佈檔案會變大。[封裝驗證說明](RUNTIME_PACKAGING.md)。
 
 ```bash
-sh scripts/build.sh all        # 同步 + 測試 + 建置所有外掛
-sh scripts/build.sh vscode     # 僅 VSCode 擴充功能
-sh scripts/build.sh jetbrains  # 僅 JetBrains 外掛
+bash scripts/build.sh all        # 同步 + 測試 + 建置 VSCode 與 Rider
+bash scripts/build.sh vscode     # 僅 VSCode 擴充功能
+bash scripts/build.sh jetbrains  # 僅 JetBrains 外掛
 ```
+
+`all` 會建置 VSCode 與 Rider。Visual Studio 請在 Windows 執行 `bash scripts/build.sh vs`。[本機開發與測試步驟](../README.md#local-development-and-validation)。
 
 ## 截圖
 

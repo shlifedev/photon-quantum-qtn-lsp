@@ -12,8 +12,8 @@ Photon Quantum3 DSL(`.qtn`) 파일을 위한 구문 강조 및 LSP 기반 Intell
 
 | IDE | 버전 |
 |-----|------|
-| VSCode | 1.50+ |
-| JetBrains Rider | 2022.3+ |
+| VSCode | 1.82+ |
+| JetBrains Rider | 2024.3+ |
 | Visual Studio | 2022 (17.0+) |
 
 ## 설치
@@ -28,20 +28,23 @@ Visual Studio와 Rider 확장에는 QTN IntelliSense용 Node.js 런타임이 포
 - **마켓플레이스**: [Quantum DSL (QTN) Language Support](https://marketplace.visualstudio.com/items?itemName=shlifedev.QtnLanguageSupport) — 또는 Visual Studio에서 **Extensions → Manage Extensions → Online**으로 들어가 `Quantum DSL (QTN)` 검색.
 
 ### JetBrains Rider
-- [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases)에서 `QtnLSP-jetbrains.zip`를 받은 뒤 **Settings → Plugins → ⚙ → Install Plugin from Disk**. _(마켓플레이스 등록 예정)_
+- **마켓플레이스**: [Quantum DSL (QTN) Language Support](https://plugins.jetbrains.com/plugin/32137-quantum-dsl-qtn-language-support) — Rider **Settings → Plugins → Marketplace**에서 `Quantum DSL (QTN)` 검색 후 설치.
+- **수동 설치**: [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases)에서 `QtnLSP-jetbrains.zip`를 받은 뒤 **Settings → Plugins → ⚙ → Install Plugin from Disk**.
 
 > 수동 설치를 원하면 모든 빌드가 [GitHub Releases](https://github.com/shlifedev/photon-quantum-qtn-lsp/releases)에 `.vsix` / `.zip`으로 첨부돼 있습니다.
 
 ## 빌드
 
 [Docker](https://www.docker.com/) 필요. 그 외 로컬 툴체인은 불필요합니다.
-로컬 Node 기반 개발은 CI와 같은 Node.js 22를 사용합니다. VS·Rider 빌드는 체크섬으로 고정한 Node.js 22.23.3을 다운로드하며, 런타임 포함으로 배포 파일 용량이 증가합니다. [런타임 패키징·검증](RUNTIME_PACKAGING.md)을 참고하세요.
+로컬 Node 기반 개발은 CI와 같은 Node.js 22.23.3를 사용합니다. VS·Rider 빌드는 체크섬으로 고정한 Node.js 22.23.3을 다운로드하며, 런타임 포함으로 배포 파일 용량이 증가합니다. [런타임 패키징·검증](RUNTIME_PACKAGING.md)을 참고하세요.
 
 ```bash
-sh scripts/build.sh all        # 동기화 + 테스트 + 전체 빌드
-sh scripts/build.sh vscode     # VSCode 확장만
-sh scripts/build.sh jetbrains  # JetBrains 플러그인만
+bash scripts/build.sh all        # 동기화 + 테스트 + VSCode·Rider 빌드
+bash scripts/build.sh vscode     # VSCode 확장만
+bash scripts/build.sh jetbrains  # JetBrains 플러그인만
 ```
+
+`all`은 VSCode와 Rider를 빌드합니다. Visual Studio는 Windows에서 `bash scripts/build.sh vs`로 별도 빌드합니다. [설치 가이드](HOW_TO_INSTALL.md)와 [로컬 개발·테스트 명령](../README.md#local-development-and-validation)을 참고하세요.
 
 ## 스크린샷
 

@@ -9,7 +9,7 @@
     "onLanguage:qtn"
   ],
   "engines": {
-    "vscode": "^1.50.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Programming Languages"
@@ -52,14 +52,15 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile && npm run webpack",
-    "compile": "cd .. && npm run compile",
-    "webpack": "cd .. && npm run webpack",
+    "vscode:prepublish": "npm run sync-grammar && npm run compile && npm run webpack",
+    "compile": "npm --prefix ../.. run compile",
+    "webpack": "npm --prefix ../.. run webpack",
     "test": "vscode-tmgrammar-test -g syntaxes/qtn.tmLanguage.json \"tests/unit/*.test\"",
     "test:snap": "vscode-tmgrammar-snap -g syntaxes/qtn.tmLanguage.json \"tests/snap/*.qtn\"",
-    "sync-grammar": "cp ../shared/syntaxes/qtn.tmLanguage.json syntaxes/qtn.tmLanguage.json",
+    "sync-grammar": "node ../../scripts/sync-grammar.mjs",
     "build": "tsc -p .",
-    "watch": "tsc -watch -p ."
+    "watch": "tsc -watch -p .",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -70,5 +71,10 @@
     "typescript": "^5.3.3",
     "@types/vscode": "^1.50.0",
     "@types/node": "^20.11.0"
+  },
+  "overrides": {
+    "@azure/msal-node": {
+      "uuid": "11.1.1"
+    }
   }
 }

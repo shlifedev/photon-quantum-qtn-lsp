@@ -5,7 +5,7 @@
 // 워크스페이스 인덱싱 + didOpen + completion이 전부 정상 동작하는지, 서버가
 // 도중에 죽지 않는지를 실제 컴파일된 server.js를 stdio로 띄워 검증한다.
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -22,6 +22,10 @@ import {
   InitializedNotification,
   DidOpenTextDocumentNotification,
   CompletionRequest,
+  DidCloseTextDocumentNotification,
+  DidChangeWatchedFilesNotification,
+  WorkspaceSymbolRequest,
+  FileChangeType,
   PublishDiagnosticsNotification,
   ShutdownRequest,
   ExitNotification,
@@ -31,7 +35,7 @@ import {
 } from 'vscode-languageserver-protocol';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const serverPath = path.resolve(here, '../../../out/server.js');
+const serverPath = process.env.QTN_TEST_SERVER ?? path.resolve(here, '../../../out/server.js');
 
 const OPEN_SOURCE = `enum WeaponType { Sword, Bow, Staff, Dagger }
 
@@ -104,14 +108,17 @@ beforeAll(async () => {
     },
   });
 
-  // 워크스페이스 인덱싱 + 진단 디바운스(250ms)가 끝날 때까지 대기
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  // Wait for an observable indexing result instead of a fixed delay.
+  await vi.waitFor(async () => {
+    const symbols = await connection.sendRequest(WorkspaceSymbolRequest.type, { query: 'Enemy' });
+    expect(symbols?.map(symbol => symbol.name)).toContain('Enemy');
+  }, { timeout: 5000 });
 });
 
 afterAll(async () => {
   try {
     await connection.sendRequest(ShutdownRequest.type, undefined);
-    connection.sendNotification(ExitNotification.type, undefined);
+    await connection.sendNotification(ExitNotification.type);
   } catch {
     // ignore
   }
@@ -145,5 +152,67 @@ describe('encoded-URI workspace (real server.js over stdio)', () => {
     });
     const labels = completionLabels(result);
     expect(labels).toEqual(expect.arrayContaining(['component', 'struct', 'enum']));
+  });
+});
+
+
+describe('Workspace file lifecycle over LSP', () => {
+  it('keeps an externally deleted open buffer until it closes, then indexes recreations', async () => {
+    const file = path.join(workspaceDir, 'lifecycle.qtn');
+    const uri = vscodeStyleUri(file);
+    const diskUri = pathToFileURL(file).href;
+    const names = async () => (await connection.sendRequest(WorkspaceSymbolRequest.type,
+      { query: 'Lifecycle' }))?.map(symbol => symbol.name);
+
+    fs.writeFileSync(file, 'struct LifecycleDisk {}');
+    await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri, languageId: 'qtn', version: 1, text: 'struct LifecycleUnsaved {}' },
+    });
+    fs.unlinkSync(file);
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri: diskUri, type: FileChangeType.Deleted }],
+    });
+    expect(await names()).toEqual(['LifecycleUnsaved']);
+
+    await connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument: { uri } });
+    await expect.poll(names).toEqual([]);
+
+    fs.writeFileSync(file, 'struct LifecycleRecreated {}');
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri: diskUri, type: FileChangeType.Created }],
+    });
+    await expect.poll(names).toEqual(['LifecycleRecreated']);
+  });
+});
+
+
+describe('Generated file watcher events', () => {
+  it('keeps generated copies out of search while allowing explicitly opened files', async () => {
+    const file = path.join(workspaceDir, 'Library', 'copy.qtn');
+    const uri = vscodeStyleUri(file);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'struct GeneratedCopy {}');
+    const names = async () => (await connection.sendRequest(WorkspaceSymbolRequest.type,
+      { query: 'GeneratedCopy' }))?.map(symbol => symbol.name);
+
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri, type: FileChangeType.Created }],
+    });
+    // Wait for an ordinary file to be indexed before checking the cache result.
+    const barrier = path.join(workspaceDir, 'barrier.qtn');
+    fs.writeFileSync(barrier, 'struct WatcherBarrier {}');
+    await connection.sendNotification(DidChangeWatchedFilesNotification.type, {
+      changes: [{ uri: pathToFileURL(barrier).href, type: FileChangeType.Created }],
+    });
+    await expect.poll(async () => (await connection.sendRequest(WorkspaceSymbolRequest.type,
+      { query: 'WatcherBarrier' }))?.length).toBe(1);
+    expect(await names()).toEqual([]);
+
+    await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: { uri, languageId: 'qtn', version: 1, text: 'struct GeneratedCopy {}' },
+    });
+    expect(await names()).toEqual(['GeneratedCopy']);
+    await connection.sendNotification(DidCloseTextDocumentNotification.type, { textDocument: { uri } });
+    expect(await names()).toEqual([]);
   });
 });

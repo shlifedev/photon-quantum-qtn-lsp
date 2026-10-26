@@ -66,6 +66,7 @@ cmd_vs() {
         exit 1
     fi
 
+    node "$ROOT_DIR/scripts/sync-grammar.mjs"
     log "Building QTN Language Server bundle for Visual Studio..."
     npm --prefix "$ROOT_DIR" ci --prefer-offline
     npm --prefix "$ROOT_DIR/packages/language-server" ci --prefer-offline

@@ -109,7 +109,7 @@ export interface SignalDefinition extends QtnAstNode {
   parameters: ParameterDefinition[];
 }
 
-// Input block (one per project)
+// Input block (declarations contribute to one generated input type)
 export interface InputDefinition extends QtnAstNode {
   kind: 'input';
   fields: FieldDefinition[];

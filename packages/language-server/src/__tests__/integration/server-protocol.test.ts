@@ -43,7 +43,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // src/__tests__/integration -> src/__tests__ -> src -> package root -> out/server.js
-const serverPath = path.resolve(here, '../../../out/server.js');
+const serverPath = process.env.QTN_TEST_SERVER ?? path.resolve(here, '../../../out/server.js');
 
 const DOC_URI = 'file:///virtual/test.qtn';
 const SOURCE = `enum WeaponType { Sword, Bow }
@@ -86,6 +86,7 @@ beforeAll(async () => {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
+    initializationOptions: { locale: 123 }, // Malformed client options must not crash initialization.
     workspaceFolders: null,
   });
   // Sanity: the server advertises the providers the IDEs rely on.
@@ -105,7 +106,7 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await connection.sendRequest(ShutdownRequest.type, undefined);
-    connection.sendNotification(ExitNotification.type, undefined);
+    await connection.sendNotification(ExitNotification.type);
   } catch {
     // ignore — we kill the process below regardless
   }
@@ -211,5 +212,28 @@ describe('LSP protocol (real server.js over stdio)', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(published).toEqual([]);
+  });
+});
+
+
+describe('Partial declaration protocol response', () => {
+  it('returns every definition site over the wire', async () => {
+    for (const [uri, text] of [
+      ['file:///virtual/parts-a.qtn', 'component SharedPlayer { FP Health; }'],
+      ['file:///virtual/parts-b.qtn', 'component SharedPlayer { int Ammo; }'],
+      ['file:///virtual/parts-use.qtn', 'struct Uses { SharedPlayer Player; }'],
+    ]) {
+      await connection.sendNotification(DidOpenTextDocumentNotification.type, {
+        textDocument: { uri, languageId: 'qtn', version: 1, text },
+      });
+    }
+    const definitions = await connection.sendRequest(DefinitionRequest.type, {
+      textDocument: { uri: 'file:///virtual/parts-use.qtn' },
+      position: { line: 0, character: 18 },
+    });
+    expect(definitions).toEqual([
+      { uri: 'file:///virtual/parts-a.qtn', range: { start: { line: 0, character: 10 }, end: { line: 0, character: 22 } } },
+      { uri: 'file:///virtual/parts-b.qtn', range: { start: { line: 0, character: 10 }, end: { line: 0, character: 22 } } },
+    ]);
   });
 });

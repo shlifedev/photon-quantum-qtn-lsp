@@ -1,212 +1,65 @@
-# QTN Syntax Highlighting
+# QTN 개발 지침
 
-> Photon Quantum3 DSL(`.qtn`) 파일의 신텍스 하이라이팅을 VSCode, JetBrains Rider, Visual Studio 2022에서 제공하는 프로젝트.
+Photon Quantum 3 `.qtn` DSL을 위한 공유 TypeScript 언어 서버와 TextMate 문법을 VSCode, JetBrains Rider, Visual Studio 2022로 배포한다.
 
-## 프로젝트 개요
+## 시작하기
 
-`.qtn`은 Quantum ECS의 게임 상태를 정의하는 DSL이다. DSL 컴파일러(`Quantum.CodeGen.Qtn`)가 `.qtn` 파일을 파싱하여 메모리 정렬, 직렬화, 디버깅 헬퍼가 포함된 C# partial struct를 생성한다.
+- 현재 작업과 미커밋 변경은 `git status --short`로 확인한다. 기존 작업을 보존한다.
+- Node 버전은 `.nvmrc`를 따른다. 처음 받았거나 lockfile이 바뀌었으면 `npm run setup`으로 세 패키지 의존성을 설치한다.
+- `npm run doctor`는 Node와 설치된 직접 의존성을 검사하며, 파일을 수정하지 않는다.
+- `npm run verify`는 전체 테스트와 검증 로그를 남긴다. 빠른 반복 작업은 `npm run verify -- --profile quick`, VSCode 패키지까지 확인할 때는 `--profile package`를 사용한다.
+- 명령 선택과 결과 해석: [docs/AI_DEVELOPMENT.md](docs/AI_DEVELOPMENT.md).
 
-이 프로젝트는 `.qtn` 파일에 대한 **정적 문법 기반 신텍스 하이라이팅**을 TextMate Grammar로 구현하고, **Language Server Protocol(LSP)** 기반 IntelliSense(자동 완성, 정의 이동, hover 등)를 제공한다. VSCode 확장, JetBrains Rider 플러그인, Visual Studio 2022 확장으로 패키징한다.
+## 수정 위치
 
-## 프로젝트 구조
+| 작업 | 소스 / 참고 |
+|---|---|
+| 토큰·구문·AST | `packages/language-server/src/lexer.ts`, `parser.ts`, `ast.ts` |
+| 타입·여러 파일의 선언 | `symbol-table.ts`, `project-model.ts` |
+| 자동 완성·hover·정의 이동 | `completion.ts`, `hover.ts`, `definition.ts`, `text-navigation.ts` |
+| 문서·워크스페이스 심볼, 타입 표시 | `symbols.ts`, `symbol-format.ts` |
+| 문서 수명·디스크 읽기 경합 | `server.ts`, `project-file-loader.ts`, `workspace-index.ts`, `uri-utils.ts` |
+| TextMate 문법 | `packages/shared/syntaxes/qtn.tmLanguage.json` |
+| VSCode 연결 | `packages/vscode-extension/src/extension.ts` |
+| Rider 연결 | `packages/jetbrains-plugin/src/main/kotlin/` |
+| Visual Studio 연결 | `packages/vs-extension/QtnLanguageClient.cs` |
+| 배포 런타임·패키지 검사 | `scripts/prepare-node-runtime.mjs`, `scripts/test-packaged-server.mjs` |
+| 개발 검증 하네스 | `scripts/dev/`, `scripts/tests/dev-harness.test.mjs` |
 
-```text
-packages/shared/syntaxes/
-└── qtn.tmLanguage.json              # 핵심 TextMate 문법 (단일 소스, 양쪽 IDE 공유)
+표의 언어 서버 파일명은 `packages/language-server/src/` 기준이다.
 
-packages/vscode-extension/
-├── package.json                      # VSCode 확장 매니페스트
-├── language-configuration.json       # 괄호 매칭, 주석 토글, 접기
-├── syntaxes/qtn.tmLanguage.json     # shared/에서 복사 (npm run sync-grammar)
-└── tests/
-    ├── unit/                         # vscode-tmgrammar-test 단위 테스트
-    └── snap/                         # 스냅샷 테스트
+## 유지할 계약
 
-packages/language-server/                      # QTN Language Server (단일 소스, 양쪽 IDE 공유)
-├── src/
-│   ├── server.ts                     # LSP 서버 진입점
-│   ├── lexer.ts                      # 토크나이저
-│   ├── parser.ts                     # 파서 (AST 생성)
-│   ├── completion.ts                 # 자동 완성
-│   ├── definition.ts                 # 정의 이동
-│   ├── hover.ts                      # Hover 정보
-│   ├── symbols.ts                    # Document/Workspace 심볼
-│   └── builtins.ts                   # Quantum 내장 타입 정의
-├── package.json
-└── tsconfig.json
+- 문법은 **shared 원본만 편집**하고 `npm run sync-grammar`로 세 IDE에 복사한다. IDE 복사본을 직접 수정하지 않는다. [스코프 매핑과 예제](docs/QTN_GRAMMAR_GUIDE.md)를 따른다.
+- LSP 기능은 **공유 `packages/language-server/src/`에 구현**한다. `out/`, `dist/`를 직접 수정하지 않는다.
+- 세 IDE는 `npm run bundle:server`로 만든 단일 `dist/server.js`를 공유한다. `node_modules`를 패키지에 동봉하지 않는다. Rider/VS는 전용 Node 런타임, VSCode는 호스트 Node를 사용한다.
+- 열린 문서 내용이 디스크보다 우선한다. 늦게 끝난 읽기가 열린 문서나 새 내용을 덮거나 삭제 파일을 되살리지 않아야 한다.
+- 초기 검색과 watcher의 Unity 캐시 제외 규칙을 일치시킨다. 캐시 파일을 직접 열면 편집 기능을 제공하고 닫을 때 제거한다.
+- 여러 파일에 나뉜 같은 타입의 필드와 선언 위치를 보존한다. 파일 읽기 순서에 결과가 좌우되면 안 된다.
+- URI를 문자열로 경로 변환하지 않는다. 공백·한글·인코딩과 Windows 드라이브를 고려해 기존 URI 유틸리티를 사용한다.
+- 미완성 QTN도 편집기의 정상 입력이다. 파서 복구 시 다음 선언을 잃지 않고, LSP 범위와 선택 범위를 유효하게 유지한다.
+- stdio 서버의 stdout은 LSP 전용이다. 디버그 출력으로 프로토콜을 오염시키지 않는다.
 
-packages/jetbrains-plugin/
-├── build.gradle.kts                  # Gradle IntelliJ Platform Plugin 2.x
-├── src/main/kotlin/                  # TextMateBundleProvider + LSP 클라이언트 구현
-└── src/main/resources/
-    ├── META-INF/
-    │   ├── plugin.xml                # 플러그인 매니페스트
-    │   └── lsp.xml                   # LSP extension (optional dependency)
-    └── bundles/qtn.tmbundle/
+## 검증과 작업 범위
 
-packages/vs-extension/
-├── QtnLanguageExtension.csproj       # VSIX 프로젝트 (SDK-style)
-├── source.extension.vsixmanifest     # VSIX 매니페스트
-├── QtnLanguage.pkgdef                # TextMate 문법 등록
-├── QtnContentTypeDefinition.cs       # .qtn content type 매핑
-├── QtnLanguageClient.cs              # ILanguageClient 구현 (LSP)
-├── language-configuration.json       # 괄호 매칭, 주석 토글, 접기
-├── Grammars/
-│   └── qtn.tmLanguage.json           # shared/에서 복사 (빌드 시 sync)
-└── LanguageServer/                   # language-server/dist/server.js 링크 (빌드 시)
-    └── server.js                     # webpack 단일 번들 (node_modules 불필요)
+- 버그는 가능하면 수정 전 실패하는 작은 회귀 사례로 재현한다. 기능에 맞는 핸들러/프로토콜/문법 테스트를 고른다.
+- 테스트 헬퍼·파일과 세부 명령은 [개발 가이드](docs/AI_DEVELOPMENT.md)에 있다. 전체 검증은 CI에서도 같은 `npm run verify`를 실행한다.
+- `.artifacts/verification/`의 `report.json`은 실행한 명령·상태·종료 코드와 로그 경로를 담는다. `quick` 통과를 전체 검증 통과로 보고하지 않는다.
+- 패키지 서버 실행과 실제 IDE UI 검증을 구분한다. 사용하지 못한 JDK/Windows/IDE 검증은 수행했다고 보고하지 않는다.
+- 컴파일러 진단·포매팅·rename 및 다른 에디터 지원은 별도 기능 요청에 따른다. 기존 타입 참조 semantic token은 구현되어 있다.
+- 대형 Unity 프로젝트 성능 측정은 현재 요청 범위에서 제외한다.
 
-packages/tests/fixtures/
-└── sample.qtn                        # 종합 테스트 픽스처
+## 저장소 로컬 스킬
 
-docs/
-├── DSL.md                            # QTN DSL 전체 문법 레퍼런스
-├── HOW_TO_INSTALL.md                 # 설치 가이드
-├── README.ko.md / ja / zh-TW        # README 번역본
-└── images/sample.png                 # README 스크린샷
+- [.agents/skills/qtn-development/SKILL.md](.agents/skills/qtn-development/SKILL.md): QTN 문법/LSP 수정 및 회귀 검증.
+- [.agents/skills/qtn-package-verification/SKILL.md](.agents/skills/qtn-package-verification/SKILL.md): 실제 VSIX/Rider ZIP 구성과 서버 실행 검증.
 
-docker/                               # Docker 빌드 환경 (Dockerfile, compose)
-scripts/                              # build.sh, install.sh, 빌드 보조 스크립트
-```
+## 관련 문서
 
-## 핵심 규칙
-
-### 문법 파일 단일 소스 (Single Source of Truth)
-
-- **항상 `packages/shared/syntaxes/qtn.tmLanguage.json`을 편집**한다
-- 편집 후 `npm run sync-grammar` (vscode-extension/) 으로 복사
-- JetBrains 번들도 동일하게 shared/에서 복사
-- 절대로 `packages/vscode-extension/syntaxes/`나 `packages/jetbrains-plugin/.../Syntaxes/`를 직접 수정하지 않는다
-
-### Language Server 단일 소스 (Single Source of Truth)
-
-- **LSP 기능 확장은 항상 `packages/language-server/src/`를 수정**한다
-- `packages/language-server/`는 VSCode, JetBrains, Visual Studio 모두에서 공유하는 단일 Language Server이다
-- 배포는 세 IDE 모두 **webpack 단일 번들** 하나를 공유한다: `npm run bundle:server` (루트) → `packages/language-server/dist/server.js`
-  - VSCode: 번들이 `packages/vscode-extension/dist/server.js`로 복사됨
-  - JetBrains: Gradle `prepareSandbox`가 `dist/`를 플러그인의 `language-server/out/`으로 복사
-  - Visual Studio: csproj가 `dist/server.js`를 `LanguageServer\server.js`로 링크
-  - node_modules는 어디에도 동봉하지 않는다 (의존성은 번들에 포함)
-- 새로운 LSP 기능(diagnostics, formatting, rename 등)을 추가할 때는 `packages/language-server/src/`에 구현하면 모든 IDE에 자동 반영된다
-
-## 명령어
-
-```bash
-# Docker로 빌드 (로컬 툴체인 불필요, Docker만 있으면 됨)
-sh scripts/build.sh sync          # 문법 파일 동기화
-sh scripts/build.sh test          # 테스트 실행
-sh scripts/build.sh vscode        # VSCode 확장 빌드
-sh scripts/build.sh jetbrains     # JetBrains 플러그인 빌드
-sh scripts/build.sh all           # sync + test + vscode + jetbrains
-sh scripts/build.sh clean         # 빌드 산출물 삭제
-```
-
-## TextMate 스코프 매핑
-
-문법 작성 시 아래 스코프 매핑을 반드시 따른다. 전체 DSL 레퍼런스는 `docs/DSL.md` 참고.
-
-### 키워드
-
-| 분류 | 스코프 | 키워드 |
-|------|--------|--------|
-| 선언 | `keyword.declaration.qtn` | `component` `struct` `input` `event` `signal` `global` `enum` `flags` `union` `asset` |
-| 수식어 | `storage.modifier.qtn` | `singleton` `abstract` |
-| 제어 | `keyword.control.qtn` | `import` `using` `synced` `local` `remote` `nothashed` `client` `server` |
-| 전처리기 | `keyword.control.directive.qtn` | `#pragma` `#define` |
-
-### 타입
-
-| 분류 | 스코프 | 타입 |
-|------|--------|------|
-| 기본 타입 | `support.type.qtn` | `bool` `Boolean` `byte` `Byte` `sbyte` `SByte` `short` `Int16` `ushort` `UInt16` `int` `Int32` `uint` `UInt32` `long` `Int64` `ulong` `UInt64` |
-| Quantum 내장 | `support.type.qtn` | `FP` `FPVector2` `FPVector3` `FPQuaternion` `FPMatrix` `FPBounds2` `FPBounds3` `EntityRef` `PlayerRef` `AssetRef` `QString` `QStringUtf8` `LayerMask` `NullableFP` `NullableFPVector2` `NullableFPVector3` `Hit` `Hit3D` `Shape2D` `Shape3D` `Joint` `DistanceJoint` `SpringJoint` `HingeJoint` |
-| 제네릭/컬렉션 | `support.type.generic.qtn` | `list` `array` `dictionary` `hash_set` `set` `bitset` `entity_ref` `player_ref` `asset_ref` |
-| 특수 타입 | `support.type.qtn` | `button` (input 블록 전용) |
-
-### 리터럴 & 주석
-
-| 패턴 | 스코프 |
-|------|--------|
-| `// ...` | `comment.line.double-slash.qtn` |
-| `/* ... */` | `comment.block.qtn` |
-| `0xFF` | `constant.numeric.hex.qtn` |
-| `3.14` | `constant.numeric.float.qtn` |
-| `42` | `constant.numeric.integer.qtn` |
-| `"text"` | `string.quoted.double.qtn` |
-
-### 기타
-
-| 패턴 | 스코프 |
-|------|--------|
-| `[Header("...")]` 등 어트리뷰트 | `meta.annotation.qtn` |
-| 선언부 타입 이름 (`component **Player** {`) | `entity.name.type.qtn` |
-
-## QTN 구문 요약
-
-```qtn
-// 타입 정의
-struct MyStruct { FP Field; }
-component MyComponent { Int32 Value; }
-singleton component MySingleton { FP Foo; }
-enum MyEnum { A, B, C }
-enum MyEnum : Byte { A = 0, B = 1 }
-flags MyFlags : Byte { None, FlagA, FlagB }
-union MyUnion { StructA A; StructB B; }
-asset MyAsset;
-
-// 이벤트/시그널
-event MyEvent { Int32 Data; }
-synced event MySyncedEvent { FP Value; }
-abstract event MyBaseEvent { Int32 Common; }
-event MyDerivedEvent : MyBaseEvent { FP Extra; }
-signal MySignal(FP damage, entity_ref target);
-
-// 입력/전역
-input { FPVector2 Move; button Jump; }
-global { FP GameTimer; }
-
-// 임포트
-import struct Foo(12);
-import enum MyEnum(byte);
-import FooComponent;
-import singleton FooComponent;
-using MyNamespace;
-
-// 전처리기
-#pragma max_players 16
-#define MY_CONST 42
-
-// 컬렉션
-list<T>, dictionary<K,V>, hash_set<T>, array<T>[N], bitset[N]
-
-// 어트리뷰트
-[Header("Combat Stats")]
-[Tooltip("min = 0\nmax = 100")]
-[AllocateOnComponentAdded, FreeOnComponentRemoved]
-[DrawIf("UseShield", 1, Equal, Hide)]
-```
-
-## 기술 스택
-
-| 영역 | 기술 |
-|------|------|
-| 문법 정의 | TextMate Grammar (JSON) |
-| VSCode 확장 | TypeScript/Node.js 18+, `@vscode/vsce` |
-| VSCode 테스트 | `vscode-tmgrammar-test` (단위 + 스냅샷) |
-| JetBrains 플러그인 | Kotlin/JDK 17+, Gradle IntelliJ Platform Plugin 2.x |
-| Visual Studio 확장 | C#/.NET 4.7.2, Microsoft.VSSDK.BuildTools, ILanguageClient |
-| 대상 IDE | VSCode 1.50+, JetBrains Rider 2022.3+, Visual Studio 2022 (17.0+) |
-
-## 범위 외
-
-- 사용자 정의 타입의 의미론적 하이라이팅
-- 코드 포매팅/리팩토링
-- Sublime Text, Vim, Emacs 등 기타 에디터\
-  
-
-## DSL 최신 참고문서
-
-https://doc.photonengine.com/ko-kr/quantum/v1/manual/quantum-dsl
+- [DSL 문법](docs/DSL.md), [설치 안내](docs/HOW_TO_INSTALL.md), [런타임 패키징](docs/RUNTIME_PACKAGING.md)
+- [Rider 빌드](packages/jetbrains-plugin/README.md#building-from-source): JDK 21 필요. VS 빌드는 Windows + VS 빌드 도구 필요.
+- [Photon 공식 DSL](https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/dsl)
+- [배포된 JetBrains 플러그인](https://plugins.jetbrains.com/plugin/32137-quantum-dsl-qtn-language-support)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

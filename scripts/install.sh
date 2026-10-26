@@ -84,7 +84,7 @@ install_jetbrains() {
     log "JetBrains plugin built at: $ZIP"
     echo ""
     echo "  JetBrains plugins must be installed via the IDE:"
-    echo "    1. Open Rider (or IntelliJ IDEA)"
+    echo "    1. Open Rider 2024.3 or later"
     echo "    2. Settings > Plugins > Gear icon > Install Plugin from Disk..."
     echo "    3. Select: $ZIP"
     echo "    4. Restart the IDE"

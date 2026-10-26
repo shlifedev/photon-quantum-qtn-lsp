@@ -38,6 +38,10 @@ function sourceRangeToLspRange(range: SourceRange): Range {
   };
 }
 
+function comparePositions(a: SourceRange['start'], b: SourceRange['start']): number {
+  return a.line - b.line || a.character - b.character;
+}
+
 /**
  * Create DocumentSymbol for a field
  */
@@ -82,7 +86,12 @@ function createParameterSymbol(parameter: ParameterDefinition): DocumentSymbol {
  */
 function createDefinitionSymbol(def: Definition): DocumentSymbol {
   const range = sourceRangeToLspRange(def.range);
-  const selectionRange = range;
+  const nameRange = 'nameRange' in def ? def.nameRange : undefined;
+  // Missing names may use a synthetic token past the declaration's end.
+  // LSP requires the selection range to stay inside the enclosing range.
+  const selectionRange = nameRange && comparePositions(range.start, nameRange.start) <= 0 &&
+    comparePositions(nameRange.end, range.end) <= 0
+    ? sourceRangeToLspRange(nameRange) : range;
 
   // Handle different definition types
   switch (def.kind) {
@@ -280,40 +289,25 @@ export function handleWorkspaceSymbol(
   params: WorkspaceSymbolParams,
   projectModel: ProjectModel
 ): SymbolInformation[] {
-  const query = params.query;
-
-  // If empty query, return all top-level symbols from all documents (flat list)
-  if (!query || query.trim() === '') {
-    const allSymbols: SymbolInformation[] = [];
-
-    for (const doc of projectModel.getAllDocuments().values()) {
-      for (const def of doc.definitions) {
-        // Skip builtin symbols - we only want user-defined symbols
-        // (builtins don't have definitions in documents anyway)
-        const symbol: SymbolInformation = {
-          name: workspaceSymbolName(def),
-          kind: nodeKindToSymbolKind(def.kind),
-          location: {
-            uri: doc.uri,
-            range: sourceRangeToLspRange(def.range),
-          },
-        };
-        allSymbols.push(symbol);
-      }
+  const query = params.query.trim().toLowerCase();
+  const results: Array<{ symbol: SymbolInformation; score: number }> = [];
+  // Search the same declarations for empty and filtered queries. A name-keyed
+  // table would hide partial declarations, using directives, and pragmas.
+  for (const doc of projectModel.getAllDocuments().values()) {
+    for (const def of doc.definitions) {
+      const name = workspaceSymbolName(def);
+      const lowerName = name.toLowerCase();
+      const score = !query ? 1 : lowerName === query ? 3 : lowerName.startsWith(query) ? 2 : lowerName.includes(query) ? 1 : 0;
+      if (score === 0) continue;
+      results.push({
+        score,
+        symbol: { name, kind: nodeKindToSymbolKind(def.kind), location: { uri: doc.uri, range: sourceRangeToLspRange(def.range) } },
+      });
     }
-
-    return allSymbols;
   }
-
-  // Non-empty query - use fuzzy search from symbol table
-  const results = projectModel.getSymbolTable().fuzzySearch(query);
-
-  // Convert SymbolInfo to SymbolInformation and filter out builtins
-  return results
-    .filter(symbol => symbol.source !== 'builtin')
-    .map(symbol => ({
-      name: symbol.name,
-      kind: symbol.kind,
-      location: symbol.location,
-    }));
+  results.sort((a, b) => b.score - a.score || a.symbol.name.localeCompare(b.symbol.name) ||
+    a.symbol.location.uri.localeCompare(b.symbol.location.uri) ||
+    a.symbol.location.range.start.line - b.symbol.location.range.start.line ||
+    a.symbol.location.range.start.character - b.symbol.location.range.start.character);
+  return results.map(result => result.symbol);
 }

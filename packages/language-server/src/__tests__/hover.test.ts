@@ -60,3 +60,9 @@ component P {
     expect(hoverText('\ncomponent P {}', 0, 0)).toBeNull();
   });
 });
+
+describe('Hover lexical context', () => {
+  it.each(['// FP', '/* FP */', '[Tooltip("FP")]'])('ignores %s', text => {
+    expect(hoverText(text, 0, text.indexOf('FP') + 1)).toBeNull();
+  });
+});

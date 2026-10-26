@@ -20,6 +20,10 @@ export function formatTypeReference(typeRef: TypeReference): string {
     result += `[${typeRef.arraySize}]`;
   }
 
+  if (typeRef.isNullable) {
+    result += '?';
+  }
+
   if (typeRef.isPointer) {
     result += '*';
   }

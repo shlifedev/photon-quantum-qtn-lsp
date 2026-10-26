@@ -120,16 +120,13 @@ export class ProjectModel {
    * @returns Location if found and user-defined, null otherwise
    */
   findDefinition(name: string): Location | null {
-    this.ensureSymbolTableFresh();
+    return this.findDefinitions(name)[0] ?? null;
+  }
 
-    const symbol = this.symbolTable.lookup(name);
-
-    // Only return user-defined symbols (not builtins or imports)
-    if (symbol && symbol.source === 'user') {
-      return symbol.location;
-    }
-
-    return null;
+  /** All declaration sites, in deterministic file/position order. */
+  findDefinitions(name: string): Location[] {
+    const symbol = this.getSymbolTable().lookup(name);
+    return symbol?.source === 'user' ? symbol.declarations ?? [symbol.location] : [];
   }
 
   /**

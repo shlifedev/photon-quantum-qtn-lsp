@@ -1,0 +1,4 @@
+interface:
+  display_name: "QTN Package Verification"
+  short_description: "Check QTN IDE archives and extracted server startup"
+  default_prompt: "Use $qtn-package-verification to validate this QTN IDE package and report the tested scope."

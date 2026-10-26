@@ -7,11 +7,12 @@ import { setupDocument, pos } from './helpers.js';
 
 function define(source: string, line: number, character: number) {
   const { projectModel, documents, uri } = setupDocument(source);
-  return handleDefinition(
+  const result = handleDefinition(
     { textDocument: { uri }, position: pos(line, character) },
     projectModel,
     documents,
   );
+  return Array.isArray(result) ? result[0] : result;
 }
 
 describe('Definition handler', () => {
@@ -34,5 +35,15 @@ component P {
   it('returns null for a field name (not a top-level symbol)', () => {
     const loc = define('component P {\n  FP Health;\n}', 1, 6);
     expect(loc).toBeNull();
+  });
+});
+
+describe('Definition lexical context', () => {
+  it.each(['// Weapon', '/* Weapon */', '[Tooltip("Weapon")]'])('ignores %s', text => {
+    expect(define(`enum Weapon { Sword }\n${text}`, 1, text.indexOf('Weapon') + 2)).toBeNull();
+  });
+
+  it('preserves the @ prefix accepted by the parser', () => {
+    expect(define('struct @Stats {}\ncomponent P { @Stats Value; }', 1, 17)?.range.start.line).toBe(0);
   });
 });

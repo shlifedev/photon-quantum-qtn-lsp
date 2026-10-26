@@ -6,7 +6,7 @@ Visual Studio ships `win-x64`. Rider ships `win-x64`, `win-arm64`, `darwin-x64`,
 
 ## Building
 
-Use Node.js 22 for source builds and JDK 21 for local Rider builds. The Docker builder supplies both. Visual Studio VSIX packaging requires Windows and the .NET SDK.
+Use Node.js 22.23.3 (the CI version) for source builds and JDK 21 for local Rider builds. The Docker builder supplies both. Visual Studio VSIX packaging requires Windows and the .NET SDK.
 
 ```sh
 npm ci
@@ -26,9 +26,12 @@ Both packages install these files under `runtimes/<platform>-<arch>/`. Launchers
 
 ```sh
 npm run test:runtimes
+npm run test:package -- vscode path/to/QtnLSP-vscode.vsix
 npm run test:package -- vs path/to/QtnLSP-vs.vsix
 npm run test:package -- jetbrains path/to/QtnLSP-jetbrains.zip
 ```
+
+The VSCode check validates the client/server bundles, manifest entry point, and exact shared grammar, then runs the extracted server using the test host’s Node. It does not run the VSCode extension host. Rider/Visual Studio checks use their bundled runtimes.
 
 Package tests unpack the actual artifact into a path containing spaces and Korean characters. They verify all required runtimes and notices, reject unexpected runtime payloads, and launch the current platform's packaged executable and server. LSP initialization, completion, hover, definition, and clean shutdown are tested with both an empty PATH and a broken Node on PATH. They do not uninstall or alter the host's Node installation. `--inspect-only` checks packaging without claiming executable verification.
 

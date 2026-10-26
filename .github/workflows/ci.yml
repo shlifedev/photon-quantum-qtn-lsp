@@ -19,15 +19,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
       - name: Verify grammar copies match shared/
-        run: |
-          for f in \
-            packages/vscode-extension/syntaxes/qtn.tmLanguage.json \
-            packages/jetbrains-plugin/src/main/resources/bundles/qtn.tmbundle/Syntaxes/qtn.tmLanguage.json \
-            packages/vs-extension/Grammars/qtn.tmLanguage.json; do
-            diff -u packages/shared/syntaxes/qtn.tmLanguage.json "$f" \
-              || { echo "::error::$f is out of sync with packages/shared/syntaxes/ — run 'sh scripts/build.sh sync'"; exit 1; }
-          done
+        run: npm run check:grammar
 
   build:
     uses: ./.github/workflows/build.yml

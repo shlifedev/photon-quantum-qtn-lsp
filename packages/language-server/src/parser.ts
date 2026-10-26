@@ -36,7 +36,7 @@ const MAX_GENERIC_DEPTH = 32;
 const TOP_LEVEL_KEYWORDS = new Set([
   'component', 'struct', 'enum', 'flags', 'union', 'event', 'signal',
   'input', 'global', 'asset', 'import', 'using', 'singleton', 'abstract',
-  '#pragma', '#define', 'synced', 'client', 'server',
+  '#pragma', '#define', 'synced', 'client', 'server', 'local', 'remote',
 ]);
 
 // Field-level modifier keywords that precede a type in field lists
@@ -129,48 +129,19 @@ class Parser {
     this.errors.push({ message, range });
   }
 
-  /**
-   * Panic-mode recovery: skip tokens until we reach a recovery anchor.
-   * Recovery anchors are: `}`, `;`, top-level keyword, or EOF.
-   * If we land on `;` we consume it. If we land on `}` we stop *before*
-   * it so the block parser can close properly.
-   *
-   * Safety guarantee: Always advances at least one token if not at EOF.
-   */
-  private skipToRecoveryPoint(): void {
-    const startPos = this.pos;
+  /** Field modifiers are declaration anchors only when followed by `event`. */
+  private isDeclarationStart(): boolean {
+    const token = this.current();
+    return token.type === TokenType.keyword && TOP_LEVEL_KEYWORDS.has(token.value) &&
+      (!FIELD_MODIFIERS.has(token.value) || this.peek().value === 'event');
+  }
 
+  /** Leave recovery anchors for the caller; parsing loops enforce progress. */
+  private skipToRecoveryPoint(): void {
     while (!this.isEof()) {
-      const tok = this.current();
-      // Top-level keyword: stop *before* consuming so the main loop dispatches it.
-      if (tok.type === TokenType.keyword && TOP_LEVEL_KEYWORDS.has(tok.value)) {
-        // Ensure we advanced at least once
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
-      // `[` for attribute lists at top level
-      if (tok.type === TokenType.punctuation && tok.value === '[') {
-        // Ensure we advanced at least once
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
-      // `;` — consume and stop
-      if (tok.type === TokenType.punctuation && tok.value === ';') {
-        this.advance();
-        return;
-      }
-      // `}` — stop *before* consuming so the block parser can close properly.
-      if (tok.type === TokenType.punctuation && tok.value === '}') {
-        // Ensure we advanced at least once
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
+      if (this.isDeclarationStart() || this.check(TokenType.punctuation, '[') ||
+          this.check(TokenType.punctuation, '}')) return;
+      if (this.match(TokenType.punctuation, ';')) return;
       this.advance();
     }
   }
@@ -785,7 +756,7 @@ class Parser {
       return fields;
     }
 
-    while (!this.isEof() && !this.check(TokenType.punctuation, '}')) {
+    while (!this.isEof() && !this.check(TokenType.punctuation, '}') && !this.isDeclarationStart()) {
       const posBefore = this.pos;
       try {
         const field = this.parseField();
@@ -819,7 +790,7 @@ class Parser {
     const attributes = this.tryParseAttributes();
 
     // Check for `}` — we may have consumed only attributes before the closing brace
-    if (this.check(TokenType.punctuation, '}')) {
+    if (this.check(TokenType.punctuation, '}') || this.isDeclarationStart()) {
       return null;
     }
 
@@ -840,6 +811,10 @@ class Parser {
     }
 
     // Field name
+    if (this.isDeclarationStart()) {
+      this.addError('Expected field name before the next declaration', this.current().range);
+      return null;
+    }
     const nameTok = this.expectIdentifierOrKeyword('field name');
 
     this.expect(TokenType.punctuation, ';');
@@ -864,32 +839,11 @@ class Parser {
     };
   }
 
-  /**
-   * Skip to `;` or `}` inside a field block for recovery.
-   * Safety guarantee: Always advances at least one token if not at EOF.
-   */
+  /** Preserve a closing brace or the next declaration for the block parser. */
   private skipToFieldRecoveryPoint(): void {
-    const startPos = this.pos;
-
     while (!this.isEof()) {
-      const tok = this.current();
-      if (tok.type === TokenType.punctuation && tok.value === ';') {
-        this.advance();
-        return;
-      }
-      if (tok.type === TokenType.punctuation && tok.value === '}') {
-        // Don't consume — let the block-close handler eat it.
-        // Ensure we advanced at least once
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
-      this.advance();
-    }
-
-    // At EOF: ensure we advanced at least once
-    if (this.pos === startPos) {
+      if (this.isDeclarationStart() || this.check(TokenType.punctuation, '}')) return;
+      if (this.match(TokenType.punctuation, ';')) return;
       this.advance();
     }
   }
@@ -905,7 +859,7 @@ class Parser {
       return members;
     }
 
-    while (!this.isEof() && !this.check(TokenType.punctuation, '}')) {
+    while (!this.isEof() && !this.check(TokenType.punctuation, '}') && !this.isDeclarationStart()) {
       const posBefore = this.pos;
       const memberStart = this.current().range;
       const nameTok = this.expectIdentifierOrKeyword('enum member name');
@@ -951,39 +905,13 @@ class Parser {
     return members;
   }
 
-  /**
-   * Skip to `,`, `}`, or identifier inside an enum block.
-   * `,` is consumed, `}` is NOT consumed (caller handles block close).
-   * Safety guarantee: Always advances at least one token if not at EOF.
-   */
+  /** Preserve the next member, declaration, or closing brace for the caller. */
   private skipToEnumRecoveryPoint(): void {
-    const startPos = this.pos;
-
     while (!this.isEof()) {
       const tok = this.current();
-      if (tok.type === TokenType.punctuation && tok.value === ',') {
-        this.advance();
-        return;
-      }
-      // `}` — stop *before* consuming so the enum block parser can close.
-      if (tok.type === TokenType.punctuation && tok.value === '}') {
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
-      if (tok.type === TokenType.identifier || tok.type === TokenType.keyword) {
-        // Next member: ensure we advanced at least once
-        if (this.pos === startPos) {
-          this.advance();
-        }
-        return;
-      }
-      this.advance();
-    }
-
-    // At EOF: ensure we advanced at least once
-    if (this.pos === startPos) {
+      if (tok.type === TokenType.identifier || tok.type === TokenType.keyword ||
+          this.check(TokenType.punctuation, '}')) return;
+      if (this.match(TokenType.punctuation, ',')) return;
       this.advance();
     }
   }
